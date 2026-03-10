@@ -134,6 +134,16 @@ td.heat .cv{position:relative;z-index:1}
 .table-footer{padding:9px 20px;border-top:1px solid var(--border);background:var(--row-even);display:flex;gap:20px;font-size:.76rem;color:var(--muted);flex-wrap:wrap;align-items:center}
 .table-footer strong{color:var(--text)}
 
+/* MULTI-SECTION */
+.report-title-bar{padding:14px 20px 10px;border-bottom:1px solid var(--border)}
+.report-title{font-size:1.1rem;font-weight:800;color:var(--text)}
+.report-sub{font-size:.78rem;color:var(--muted);margin-top:3px}
+.section-wrap{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--border)}
+.section-wrap+.section-wrap{margin-top:16px}
+.section-title-bar{padding:10px 20px 8px;border-bottom:1px solid var(--border);background:var(--row-even);display:flex;align-items:center;justify-content:space-between}
+.section-title{font-size:.88rem;font-weight:700;color:var(--text)}
+.section-badge{font-size:.7rem;padding:2px 8px;border-radius:999px;border:1.5px solid var(--border);color:var(--muted)}
+
 /* EMPTY */
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:70px 20px;color:var(--muted);text-align:center;gap:10px}
 .empty-icon{font-size:3rem;opacity:.25}
@@ -314,48 +324,61 @@ td.heat .cv{position:relative;z-index:1}
 // ============================================================
 //  STATE
 // ============================================================
-let parsedData  = null;   // { headers:[], rows:[] }
-let colTypes    = [];     // 'num'|'text'
+// allSections: [{title, headers, rows, colTypes, sortCol, sortAsc}]
+let allSections = [];
+let parsedData  = null;   // 後方互換（export等で参照）
 let scheme      = 'blue';
-let sortCol     = -1;
-let sortAsc     = true;
 let parseMethod = '';
 
 // ============================================================
-//  HTML TABLE PARSER  (Excel / Google Sheets → 最高精度)
+//  HTML TABLE PARSER  ― 複数テーブル対応
+//  戻り値: [{title, rows}]  (rows = [header行, ...データ行])
 // ============================================================
-function parseHtmlTable(html) {
-  // DOMParser を使って完全なHTMLドキュメントとして解析
-  // (div.innerHTML では <html><body> タグや大きなHTMLで問題が起きる)
+function parseHtmlTables(html) {
   let doc;
-  try {
-    doc = new DOMParser().parseFromString(html, 'text/html');
-  } catch(_) {
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    doc = div;
-  }
+  try { doc = new DOMParser().parseFromString(html, 'text/html'); }
+  catch(_) { const d=document.createElement('div'); d.innerHTML=html; doc=d; }
 
-  // セル数が最大のテーブルを選択
-  const tables = Array.from(doc.querySelectorAll('table'));
-  if (!tables.length) return null;
-  const tbl = tables.reduce((a, b) =>
-    a.querySelectorAll('td,th').length >= b.querySelectorAll('td,th').length ? a : b
-  );
-
-  const rows = [];
-  tbl.querySelectorAll('tr').forEach(tr => {
-    const cells = [];
-    tr.querySelectorAll('td,th').forEach(td => {
-      // textContent を使う（innerText は未接続DOMでは動かない）
-      let t = (td.textContent || '').replace(/\s+/g, ' ').trim();
-      cells.push(t);
-    });
-    if (cells.some(c => c !== '')) rows.push(cells);
+  // トップレベルのテーブルのみ取得（ネスト内テーブルは除外）
+  const allTbls = Array.from(doc.querySelectorAll('table'));
+  const topTbls = allTbls.filter(t => {
+    let p = t.parentElement;
+    while(p){ if(p.tagName==='TABLE') return false; p=p.parentElement; }
+    return true;
   });
+  if(!topTbls.length) return null;
 
-  if (rows.length < 1) return null;
-  return rows;
+  const sections = [];
+  for(const tbl of topTbls){
+    // テーブル直前のテキストをセクションタイトルとして取得
+    const title = getPrecText(tbl);
+    const rows = extractRows(tbl);
+    if(rows && rows.length >= 2 && rows[0].length >= 2) sections.push({title, rows});
+  }
+  return sections.length ? sections : null;
+}
+
+function extractRows(tbl){
+  const rows=[];
+  tbl.querySelectorAll('tr').forEach(tr=>{
+    const cells=[];
+    tr.querySelectorAll('td,th').forEach(td=>{
+      cells.push((td.textContent||'').replace(/\s+/g,' ').trim());
+    });
+    if(cells.some(c=>c!=='')) rows.push(cells);
+  });
+  return rows.length ? rows : null;
+}
+
+function getPrecText(el){
+  // 直前の兄弟要素または親のテキストを最大60文字取得
+  let node = el.previousSibling;
+  while(node){
+    const t=(node.textContent||'').trim().replace(/\s+/g,' ');
+    if(t.length>1) return t.slice(0,80);
+    node=node.previousSibling;
+  }
+  return '';
 }
 
 // ============================================================
@@ -414,11 +437,12 @@ function parseFixedWidth(lines) {
   );
 }
 
+// テキストを行リストに解析して {rows} を返す（単一テーブル）
 function parseText(raw) {
   raw = raw.trim()
     .replace(/\r\n/g,'\n').replace(/\r/g,'\n')
-    .replace(/[\u200B-\u200D\uFEFF]/g,'')   // ゼロ幅文字
-    .replace(/　/g,' ');                      // 全角スペース
+    .replace(/[\u200B-\u200D\uFEFF]/g,'')
+    .replace(/　/g,' ');
   if(!raw) return null;
 
   const lines = raw.split('\n').filter(l=>l.trim());
@@ -428,63 +452,81 @@ function parseText(raw) {
   let rows;
 
   if(manual!=='auto'){
-    const fns={
-      tab:   l=>l.split('\t').map(c=>c.trim()),
-      comma: l=>csvSplit(l),
-      space: l=>l.trim().split(/\s+/).filter(c=>c),
-      pipe:  l=>pipeSplit(l),
-      semi:  l=>l.split(';').map(c=>c.trim()),
-    };
-    rows = lines.map(fns[manual]||(l=>[l]));
-    parseMethod = manual;
+    const fns={tab:l=>l.split('\t').map(c=>c.trim()),comma:l=>csvSplit(l),
+      space:l=>l.trim().split(/\s+/).filter(c=>c),pipe:l=>pipeSplit(l),semi:l=>l.split(';').map(c=>c.trim())};
+    rows=lines.map(fns[manual]||(l=>[l]));
+    parseMethod=manual;
   } else {
     const cands=[];
-
-    // タブ (TSV)
-    const tRows=lines.map(l=>l.split('\t').map(c=>c.trim()));
-    cands.push({name:'TSV',rows:tRows,score:scoreRows(tRows)});
-
-    // CSV
-    const cRows=lines.map(csvSplit);
-    cands.push({name:'CSV',rows:cRows,score:scoreRows(cRows)});
-
-    // セミコロン
-    const sRows=lines.map(l=>l.split(';').map(c=>c.trim()));
-    cands.push({name:'セミコロン',rows:sRows,score:scoreRows(sRows)});
-
-    // Markdownテーブル
-    const hasPipe=lines.filter(l=>l.includes('|')).length>lines.length*.5;
-    if(hasPipe){
-      const noSep=lines.filter(l=>!/^\|?[\s|:-]+\|/.test(l));
-      const pRows=noSep.map(pipeSplit);
-      cands.push({name:'Markdown',rows:pRows,score:scoreRows(pRows)});
+    const tR=lines.map(l=>l.split('\t').map(c=>c.trim()));
+    cands.push({name:'TSV',rows:tR,score:scoreRows(tR)});
+    const cR=lines.map(csvSplit);
+    cands.push({name:'CSV',rows:cR,score:scoreRows(cR)});
+    const sR=lines.map(l=>l.split(';').map(c=>c.trim()));
+    cands.push({name:'セミコロン',rows:sR,score:scoreRows(sR)});
+    if(lines.filter(l=>l.includes('|')).length>lines.length*.5){
+      const pR=lines.filter(l=>!/^\|?[\s|:-]+\|/.test(l)).map(pipeSplit);
+      cands.push({name:'Markdown',rows:pR,score:scoreRows(pR)});
     }
-
-    // スペース2+
     const s2=lines.map(l=>l.trim().split(/\s{2,}/).map(c=>c.trim()).filter(c=>c));
     cands.push({name:'スペース',rows:s2,score:scoreRows(s2)});
-
-    // スペース1+
     const s1=lines.map(l=>l.trim().split(/\s+/).filter(c=>c));
     cands.push({name:'スペース',rows:s1,score:scoreRows(s1)});
-
-    // 固定幅
     const fw=parseFixedWidth(lines);
     if(fw) cands.push({name:'固定幅',rows:fw,score:scoreRows(fw)});
-
     const best=cands.reduce((a,b)=>b.score>a.score?b:a,cands[0]);
-    rows=best.rows;
-    parseMethod=best.name;
+    rows=best.rows; parseMethod=best.name;
   }
 
-  // 列数を中央値に統一
   const med=[...rows.map(r=>r.length)].sort((a,b)=>a-b)[Math.floor(rows.length/2)];
   rows=rows.map(r=>{const c=[...r];while(c.length<med)c.push('');return c.slice(0,med)});
-
   const headers=rows[0];
   const dataRows=rows.slice(1);
-  colTypes=detectColTypes(headers,dataRows);
-  return{headers,rows:dataRows};
+  return{headers,rows:dataRows,colTypes:detectColTypes(headers,dataRows)};
+}
+
+// テキストを複数セクションに分割してパース
+// 同じヘッダ行が繰り返される or ①②③ などの区切り文字で分割
+function parseTextSections(raw) {
+  raw = raw.trim()
+    .replace(/\r\n/g,'\n').replace(/\r/g,'\n')
+    .replace(/[\u200B-\u200D\uFEFF]/g,'').replace(/　/g,' ');
+  if(!raw) return null;
+
+  const lines = raw.split('\n').filter(l=>l.trim());
+  if(!lines.length) return null;
+
+  // 単一テーブルとして解析
+  const single = parseText(raw);
+  if(!single || !single.rows.length) return null;
+
+  const sections = [];
+
+  // ヘッダ行を検出: 同じ列数でほぼ同じ内容の行が複数回現れる場合に分割
+  const headerCandidate = single.headers.join('\t');
+  const allRaw = [single.headers, ...single.rows];
+  const headerIdxs = [];
+  allRaw.forEach((row, i) => {
+    if(i > 0 && row.join('\t') === headerCandidate) headerIdxs.push(i);
+  });
+
+  if(headerIdxs.length > 0) {
+    // ヘッダが繰り返されている → 複数テーブルに分割
+    const splits = [0, ...headerIdxs, allRaw.length];
+    for(let i=0; i<splits.length-1; i++){
+      const chunk = allRaw.slice(splits[i], splits[i+1]);
+      if(chunk.length < 2) continue;
+      const h=chunk[0], dr=chunk.slice(1);
+      sections.push({title:'', rows:chunk, headers:h, dataRows:dr, colTypes:detectColTypes(h,dr), sortCol:-1, sortAsc:true});
+    }
+  } else {
+    // ①②③ などでテキストが区切られているか試みる（TSVの場合はセクション行を検出）
+    // → 単一テーブルとして返す
+    sections.push({title:'', rows:[single.headers,...single.rows], headers:single.headers,
+      dataRows:single.rows, colTypes:single.colTypes, sortCol:-1, sortAsc:true});
+  }
+
+  return sections.length ? sections : null;
 }
 
 function detectColTypes(headers,dataRows){
@@ -505,146 +547,186 @@ function toNum(s){
   return isNaN(n)?null:n;
 }
 
+function e(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 // ============================================================
-//  RENDER
+//  RENDER  ― 全セクション描画
 // ============================================================
 function render(){
-  if(!parsedData) return;
-  const{headers,rows}=parsedData;
+  if(!allSections.length) return;
 
-  let dRows=[...rows];
-  if(sortCol>=0){
-    dRows.sort((a,b)=>{
-      const av=colTypes[sortCol]==='num'?(toNum(a[sortCol])??-Infinity):a[sortCol];
-      const bv=colTypes[sortCol]==='num'?(toNum(b[sortCol])??-Infinity):b[sortCol];
-      return sortAsc?(av<bv?-1:av>bv?1:0):(av>bv?-1:av<bv?1:0);
-    });
-  }
-
-  const colMM=headers.map((_,ci)=>{
-    if(colTypes[ci]!=='num') return null;
-    const v=rows.map(r=>toNum(r[ci])).filter(v=>v!==null);
-    return v.length?{min:Math.min(...v),max:Math.max(...v)}:null;
-  });
-
-  const totals=document.getElementById('tog-total').checked
-    ?headers.map((_,ci)=>{
-        if(colTypes[ci]!=='num') return null;
-        return rows.map(r=>toNum(r[ci])).filter(v=>v!==null).reduce((a,b)=>a+b,0);
-      })
-    :null;
-
-  const showIdx=document.getElementById('tog-rownum').checked;
-  const showHeat=document.getElementById('tog-heat').checked;
-  const showSum=document.getElementById('tog-summary').checked;
-  const title=document.getElementById('title-inp').value;
-  const sub=document.getElementById('subtitle-inp').value;
-  const fmt=document.getElementById('num-fmt').value;
+  const showIdx  = document.getElementById('tog-rownum').checked;
+  const showHeat = document.getElementById('tog-heat').checked;
+  const showSum  = document.getElementById('tog-summary').checked;
+  const showTot  = document.getElementById('tog-total').checked;
+  const fmt      = document.getElementById('num-fmt').value;
+  const mainTitle= document.getElementById('title-inp').value;
+  const mainSub  = document.getElementById('subtitle-inp').value;
+  const today    = new Date().toLocaleDateString('ja-JP');
+  const multiSec = allSections.length > 1;
 
   function fmtNum(val,n){
     if(fmt==='comma'||(fmt==='auto'&&Math.abs(n)>=1000))
       return n.toLocaleString('ja-JP',{maximumFractionDigits:4});
     if(fmt==='pct') return (n*100).toFixed(1)+'%';
-    if(val.includes(',')) return n.toLocaleString('ja-JP');
+    if(val&&val.includes(',')) return n.toLocaleString('ja-JP');
     return val;
   }
 
-  let h='';
-  if(title||sub){
-    h+=`<div class="table-title-bar">
-      ${title?`<div class="table-title">${e(title)}</div>`:''}
-      ${sub?`<div class="table-subtitle">${e(sub)}</div>`:''}
+  let outer = '';
+
+  // レポートヘッダー（複数セクション時のみ or タイトル入力時）
+  if(mainTitle||mainSub){
+    outer += `<div class="report-title-bar">
+      ${mainTitle?`<div class="report-title">${e(mainTitle)}</div>`:''}
+      ${mainSub?`<div class="report-sub">${e(mainSub)}</div>`:''}
     </div>`;
   }
 
-  h+=`<div class="table-scroll"><table class="theme-${scheme}"><thead><tr>`;
-  if(showIdx) h+='<th></th>';
-  headers.forEach((hdr,ci)=>{
-    const isN=colTypes[ci]==='num';
-    const isSorted=sortCol===ci;
-    h+=`<th class="${isN?'num':''} ${isSorted?'sorted':''}" onclick="doSort(${ci})">
-      ${e(hdr)}<span class="si">${isSorted?(sortAsc?'↑':'↓'):'↕'}</span></th>`;
-  });
-  h+='</tr></thead><tbody>';
+  allSections.forEach((sec, si) => {
+    const{headers,dataRows,colTypes:ct}=sec;
 
-  dRows.forEach((row,ri)=>{
-    h+='<tr>';
-    if(showIdx) h+=`<td class="row-idx">${ri+1}</td>`;
-    row.forEach((val,ci)=>{
-      const n=colTypes[ci]==='num'?toNum(val):null;
-      const isN=n!==null;
-      let cls=isN?'num':'';
-      if(isN){if(n<0)cls+=' neg';else if(n===0)cls+=' zero';}
-      const disp=isN?fmtNum(val,n):val;
+    let dRows=[...dataRows];
+    if(sec.sortCol>=0){
+      dRows.sort((a,b)=>{
+        const av=ct[sec.sortCol]==='num'?(toNum(a[sec.sortCol])??-Infinity):a[sec.sortCol];
+        const bv=ct[sec.sortCol]==='num'?(toNum(b[sec.sortCol])??-Infinity):b[sec.sortCol];
+        return sec.sortAsc?(av<bv?-1:av>bv?1:0):(av>bv?-1:av<bv?1:0);
+      });
+    }
 
-      if(showHeat&&isN&&colMM[ci]&&colMM[ci].max!==colMM[ci].min){
-        const pct=Math.round((n-colMM[ci].min)/(colMM[ci].max-colMM[ci].min)*100);
-        h+=`<td class="${cls} heat"><span class="bar" style="width:${pct}%"></span><span class="cv">${e(disp)}</span></td>`;
-      } else {
-        h+=`<td class="${cls}">${e(disp)}</td>`;
-      }
+    const colMM=headers.map((_,ci)=>{
+      if(ct[ci]!=='num') return null;
+      const v=dataRows.map(r=>toNum(r[ci])).filter(v=>v!==null);
+      return v.length?{min:Math.min(...v),max:Math.max(...v)}:null;
     });
-    h+='</tr>';
+
+    const totals=showTot?headers.map((_,ci)=>{
+      if(ct[ci]!=='num') return null;
+      return dataRows.map(r=>toNum(r[ci])).filter(v=>v!==null).reduce((a,b)=>a+b,0);
+    }):null;
+
+    let h='';
+
+    // セクションタイトル（複数セクション or タイトルあり時）
+    if(multiSec || sec.title){
+      const dispTitle = sec.title || `表 ${si+1}`;
+      h+=`<div class="section-title-bar">
+        <span class="section-title">${e(dispTitle)}</span>
+        <span class="section-badge">${dRows.length}行 × ${headers.length}列</span>
+      </div>`;
+    } else if(!mainTitle && !mainSub){
+      // 単一テーブルでタイトルなし → 従来の table-title-bar
+    }
+
+    h+=`<div class="table-scroll"><table class="theme-${scheme}"><thead><tr>`;
+    if(showIdx) h+='<th></th>';
+    headers.forEach((hdr,ci)=>{
+      const isN=ct[ci]==='num';
+      const isSorted=sec.sortCol===ci;
+      h+=`<th class="${isN?'num':''} ${isSorted?'sorted':''}" onclick="doSort(${si},${ci})">
+        ${e(hdr)}<span class="si">${isSorted?(sec.sortAsc?'↑':'↓'):'↕'}</span></th>`;
+    });
+    h+='</tr></thead><tbody>';
+
+    dRows.forEach((row,ri)=>{
+      h+='<tr>';
+      if(showIdx) h+=`<td class="row-idx">${ri+1}</td>`;
+      row.forEach((val,ci)=>{
+        const n=ct[ci]==='num'?toNum(val):null;
+        const isN=n!==null;
+        let cls=isN?'num':'';
+        if(isN){if(n<0)cls+=' neg';else if(n===0)cls+=' zero';}
+        const disp=isN?fmtNum(val,n):val;
+        if(showHeat&&isN&&colMM[ci]&&colMM[ci].max!==colMM[ci].min){
+          const pct=Math.round((n-colMM[ci].min)/(colMM[ci].max-colMM[ci].min)*100);
+          h+=`<td class="${cls} heat"><span class="bar" style="width:${pct}%"></span><span class="cv">${e(disp)}</span></td>`;
+        } else {
+          h+=`<td class="${cls}">${e(disp)}</td>`;
+        }
+      });
+      h+='</tr>';
+    });
+
+    if(totals){
+      h+='<tr class="total-row">';
+      if(showIdx) h+='<td class="row-idx">計</td>';
+      totals.forEach((t,ci)=>{
+        if(t===null) h+=`<td style="color:var(--muted);font-size:.78rem">合計</td>`;
+        else h+=`<td class="num">${t.toLocaleString('ja-JP',{maximumFractionDigits:4})}</td>`;
+      });
+      h+='</tr>';
+    }
+
+    h+='</tbody></table></div>';
+
+    if(showSum){
+      const numC=ct.filter(t=>t==='num').length;
+      h+=`<div class="table-footer">
+        <span><strong>${dRows.length}</strong> 行 × <strong>${headers.length}</strong> 列</span>
+        <span>数値列: <strong>${numC}</strong></span>
+        ${sec.sortCol>=0?`<span>ソート: <strong>${e(headers[sec.sortCol])}</strong></span>`:''}
+        ${!multiSec?`<span style="margin-left:auto">作成日: ${today}</span>`:''}
+      </div>`;
+    }
+
+    const wrap = multiSec ? `<div class="section-wrap">${h}</div>` : h;
+    outer += wrap;
   });
 
-  if(totals){
-    h+='<tr class="total-row">';
-    if(showIdx) h+='<td class="row-idx">計</td>';
-    totals.forEach((t,ci)=>{
-      if(t===null) h+=`<td style="color:var(--muted);font-size:.78rem">合計</td>`;
-      else h+=`<td class="num">${t.toLocaleString('ja-JP',{maximumFractionDigits:4})}</td>`;
-    });
-    h+='</tr>';
-  }
-
-  h+='</tbody></table></div>';
-
-  if(showSum){
-    const numC=colTypes.filter(t=>t==='num').length;
-    const today=new Date().toLocaleDateString('ja-JP');
-    h+=`<div class="table-footer">
-      <span><strong>${dRows.length}</strong> 行 × <strong>${headers.length}</strong> 列</span>
-      <span>数値列: <strong>${numC}</strong></span>
-      ${sortCol>=0?`<span>ソート: <strong>${e(headers[sortCol])}</strong> ${sortAsc?'昇順':'降順'}</span>`:''}
+  if(multiSec && showSum){
+    const totalRows = allSections.reduce((s,sec)=>s+sec.dataRows.length,0);
+    outer += `<div class="table-footer" style="background:var(--surface);border:1px solid var(--border);border-radius:0 0 14px 14px;margin-top:-1px">
+      <span>合計 <strong>${allSections.length}</strong> テーブル / <strong>${totalRows}</strong> 行</span>
       <span style="margin-left:auto">作成日: ${today}</span>
     </div>`;
   }
 
-  document.getElementById('table-container').innerHTML=h;
+  document.getElementById('table-container').innerHTML = outer;
 }
 
-function e(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
 // ============================================================
-//  SORT
+//  SORT  ― セクション単位
 // ============================================================
-function doSort(ci){
-  if(sortCol===ci){ if(sortAsc){sortAsc=false}else{sortCol=-1;sortAsc=true} }
-  else{sortCol=ci;sortAsc=true}
-  document.getElementById('sort-reset-btn').style.display=sortCol>=0?'':'none';
+function doSort(si, ci){
+  const sec = allSections[si];
+  if(!sec) return;
+  if(sec.sortCol===ci){ if(sec.sortAsc){sec.sortAsc=false}else{sec.sortCol=-1;sec.sortAsc=true} }
+  else{sec.sortCol=ci;sec.sortAsc=true}
   render();
 }
-function resetSort(){sortCol=-1;sortAsc=true;document.getElementById('sort-reset-btn').style.display='none';render();}
+function resetSort(){
+  allSections.forEach(s=>{s.sortCol=-1;s.sortAsc=true;});
+  document.getElementById('sort-reset-btn').style.display='none';
+  render();
+}
 
 // ============================================================
 //  SET PARSED DATA  (共通ヘルパー)
 // ============================================================
-function applyData(rows, method){
-  if(!rows||rows.length<1) return false;
-  const headers=rows[0];
-  const dataRows=rows.slice(1);
-  colTypes=detectColTypes(headers,dataRows);
-  parsedData={headers,rows:dataRows};
-  parseMethod=method;
-  sortCol=-1;sortAsc=true;
+
+// [{title, rows}] 形式から allSections を構築
+function applySections(sections, method){
+  if(!sections||!sections.length) return false;
+  allSections = sections.map(sec=>{
+    const rows = sec.rows || [sec.headers, ...(sec.dataRows||[])];
+    const headers  = rows[0];
+    const dataRows = rows.slice(1);
+    const ct = sec.colTypes || detectColTypes(headers, dataRows);
+    return {title: sec.title||'', headers, dataRows, colTypes:ct, sortCol:-1, sortAsc:true};
+  });
+  parsedData = {headers:allSections[0].headers, rows:allSections[0].dataRows}; // 後方互換
+  parseMethod = method;
   document.getElementById('sort-reset-btn').style.display='none';
-  updateHint(dataRows.length,headers.length,method);
+  const totalRows = allSections.reduce((s,sec)=>s+sec.dataRows.length,0);
+  updateHint(totalRows, allSections[0].headers.length, method, allSections.length);
   render();
   return true;
 }
 
-function updateHint(numRows,numCols,method){
-  document.getElementById('parse-hint').textContent=`${numRows}行 × ${numCols}列`;
+function updateHint(numRows, numCols, method, numSections){
+  const secLabel = numSections>1 ? `${numSections}テーブル / ` : '';
+  document.getElementById('parse-hint').textContent=`${secLabel}${numRows}行 × ${numCols}列`;
   const badge=document.getElementById('parse-badge');
   badge.textContent=method;
   badge.style.display='inline';
@@ -665,43 +747,42 @@ async function processPaste(clipboardData) {
   const html  = clipboardData.getData('text/html');
   const plain = clipboardData.getData('text/plain');
 
-  // 2) HTMLテーブルとプレーンテキストを両方パースし、行数が多い方を採用
-  let htmlRows  = null;
-  let plainRows = null;
-
+  // 2) HTML複数テーブルを試みる
+  let htmlSections = null;
   if (html && html.includes('<table')) {
-    htmlRows = parseHtmlTable(html);
-    // 列が1以下しかないなら不採用
-    if (htmlRows && htmlRows[0] && htmlRows[0].length < 2) htmlRows = null;
+    htmlSections = parseHtmlTables(html);
+    // 全テーブルの総行数
+    if (htmlSections) {
+      const totalHtmlRows = htmlSections.reduce((s,sec)=>s+sec.rows.length,0);
+      // plain text の行数と比較し、大きく下回る場合はplainを使う
+      const plainLines = (plain||'').split('\n').filter(l=>l.trim()).length;
+      if (totalHtmlRows < plainLines * 0.7) htmlSections = null;
+    }
   }
 
+  if (htmlSections) {
+    // TSV表現をテキストエリアに表示
+    const tsvAll = htmlSections.map(s=>s.rows.map(r=>r.join('\t')).join('\n')).join('\n\n');
+    document.getElementById('raw-input').value = tsvAll;
+    applySections(htmlSections, 'HTMLテーブル');
+    const total = htmlSections.reduce((s,sec)=>s+sec.rows.length-1, 0);
+    showToast(`${htmlSections.length}テーブル / ${total}行 を取り込みました ✓`);
+    return;
+  }
+
+  // 3) プレーンテキスト
   if (plain && plain.trim()) {
-    const r = parseText(plain);
-    if (r) plainRows = [r.headers, ...r.rows];
-  }
-
-  // 行数が多い方を選ぶ（HTMLが途中で切れていてもプレーンテキストで補完）
-  let chosen = null;
-  let method = '';
-  if (htmlRows && plainRows) {
-    if (htmlRows.length >= plainRows.length) { chosen = htmlRows; method = 'HTMLテーブル'; }
-    else                                     { chosen = plainRows; method = parseMethod; }
-  } else if (htmlRows)  { chosen = htmlRows;  method = 'HTMLテーブル'; }
-  else if (plainRows)   { chosen = plainRows; method = parseMethod; }
-
-  if (!chosen || chosen.length < 1) {
-    // 最終フォールバック：プレーンテキストをそのまま
-    if (plain) {
-      document.getElementById('raw-input').value = plain;
-      onTextChange();
+    document.getElementById('raw-input').value = plain;
+    const secs = parseTextSections(plain);
+    if (secs) {
+      applySections(secs, parseMethod);
+      const total = secs.reduce((s,sec)=>s+sec.dataRows.length, 0);
+      showToast(`${secs.length>1?secs.length+'テーブル / ':''}${total}行 を取り込みました ✓`);
     }
     return;
   }
 
-  // テキストエリアにTSVとして反映（ユーザーが内容を確認できる）
-  document.getElementById('raw-input').value = chosen.map(r => r.join('\t')).join('\n');
-  applyData(chosen, method);
-  showToast(`${chosen.length - 1} 行 × ${chosen[0].length} 列 を取り込みました ✓`);
+  if (plain) { document.getElementById('raw-input').value = plain; onTextChange(); }
 }
 
 // テキストエリアのペースト
@@ -726,18 +807,14 @@ document.addEventListener('paste', async e => {
 // テキストエリアへの手入力
 function onTextChange(){
   const val=document.getElementById('raw-input').value;
-  if(!val.trim()){
-    clearAll();return;
-  }
-  const result=parseText(val);
-  if(!result){
+  if(!val.trim()){ clearAll(); return; }
+  const secs=parseTextSections(val);
+  if(!secs){
     document.getElementById('parse-hint').textContent='解析できませんでした';
     document.getElementById('parse-badge').style.display='none';
     return;
   }
-  parsedData=result;
-  updateHint(result.rows.length,result.headers.length,parseMethod);
-  render();
+  applySections(secs, parseMethod);
 }
 
 function clearAll(){
@@ -745,7 +822,7 @@ function clearAll(){
   document.getElementById('parse-hint').textContent='データを貼り付けてください';
   document.getElementById('parse-badge').style.display='none';
   document.getElementById('sort-reset-btn').style.display='none';
-  parsedData=null;colTypes=[];sortCol=-1;
+  allSections=[]; parsedData=null;
   document.getElementById('table-container').innerHTML=`<div class="empty-state">
     <div class="empty-icon">📋</div>
     <div class="empty-title">データを貼り付けてください</div>
@@ -796,8 +873,8 @@ async function ocrImage(blob){
     const tsv=wordsToTsv(data.words);
     const ta=document.getElementById('raw-input');
     ta.value=tsv;
-    const result=parseText(tsv);
-    if(result){ parsedData=result; updateHint(result.rows.length,result.headers.length,'OCR'); render(); }
+    const secs=parseTextSections(tsv);
+    if(secs){ applySections(secs,'OCR'); }
     showToast('OCR完了 ✓');
   }catch(err){
     console.error(err);showToast('OCR失敗: '+err.message);
@@ -874,26 +951,6 @@ function toggleTheme(){
 //  EXPORT
 // ============================================================
 function printTable(){window.print();}
-async function downloadImage(){
-  if(!parsedData){showToast('データがありません');return;}
-  showToast('画像生成中...');
-  const canvas=await html2canvas(document.getElementById('table-container'),{scale:2,backgroundColor:null});
-  const a=document.createElement('a');
-  a.href=canvas.toDataURL('image/png');
-  a.download=(document.getElementById('title-inp').value||'数表')+'.png';
-  a.click();showToast('PNG保存しました ✓');
-}
-async function copyImage(){
-  if(!parsedData){showToast('データがありません');return;}
-  try{
-    showToast('クリップボードにコピー中...');
-    const canvas=await html2canvas(document.getElementById('table-container'),{scale:2,backgroundColor:null});
-    canvas.toBlob(async blob=>{
-      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
-      showToast('画像をコピーしました ✓');
-    });
-  }catch(err){showToast('コピー失敗（ブラウザ制限）');}
-}
 
 function showToast(msg){
   const t=document.getElementById('toast');
@@ -940,6 +997,27 @@ function loadSample(k){
   document.getElementById('raw-input').value=SAMPLES[k];
   document.getElementById('title-inp').value=titles[k];
   onTextChange();
+}
+
+async function downloadImage(){
+  if(!allSections.length){showToast('データがありません');return;}
+  showToast('画像生成中...');
+  const canvas=await html2canvas(document.getElementById('table-container'),{scale:2,backgroundColor:null});
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download=(document.getElementById('title-inp').value||'数表')+'.png';
+  a.click();showToast('PNG保存しました ✓');
+}
+async function copyImage(){
+  if(!allSections.length){showToast('データがありません');return;}
+  try{
+    showToast('クリップボードにコピー中...');
+    const canvas=await html2canvas(document.getElementById('table-container'),{scale:2,backgroundColor:null});
+    canvas.toBlob(async blob=>{
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      showToast('画像をコピーしました ✓');
+    });
+  }catch(err){showToast('コピー失敗（ブラウザ制限）');}
 }
 </script>
 </body>
