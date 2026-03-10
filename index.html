@@ -1,429 +1,1050 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>綺麗な数表</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数表メーカー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --muted: #64748b;
+  --accent: #3b82f6;
+  --accent2: #7c3aed;
+  --header-bg: #1e293b;
+  --header-text: #ffffff;
+  --row-even: #f8fafc;
+  --row-odd: #ffffff;
+  --row-hover: #eff6ff;
+  --num-pos: #1d4ed8;
+  --num-neg: #dc2626;
+  --heat-low: #eff6ff;
+  --heat-high: #1e40af;
+  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
 
-    body {
-      min-height: 100vh;
-      background: #0a0a1a;
-      font-family: 'Segoe UI', sans-serif;
-      overflow-x: hidden;
-    }
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --border: #334155;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #60a5fa;
+  --accent2: #a78bfa;
+  --header-bg: #0f172a;
+  --header-text: #f1f5f9;
+  --row-even: #1a2740;
+  --row-odd: #1e293b;
+  --row-hover: #1e3a5f;
+  --num-pos: #60a5fa;
+  --num-neg: #f87171;
+  --heat-low: #1e293b;
+  --heat-high: #3b82f6;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
 
-    .bg-grid {
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(100,100,255,0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(100,100,255,0.05) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-    }
+* { margin:0; padding:0; box-sizing:border-box; }
 
-    header {
-      text-align: center;
-      padding: 48px 20px 24px;
-      position: relative;
-    }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+}
 
-    h1 {
-      font-size: 2.8rem;
-      font-weight: 800;
-      background: linear-gradient(135deg, #a78bfa, #60a5fa, #34d399);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      letter-spacing: 0.05em;
-    }
+/* ===== HEADER ===== */
+.app-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
 
-    .subtitle {
-      color: #64748b;
-      margin-top: 8px;
-      font-size: 0.95rem;
-    }
+.app-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 
-    .controls {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      padding: 20px;
-      flex-wrap: wrap;
-    }
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 
-    .tab-btn {
-      padding: 10px 24px;
-      border-radius: 9999px;
-      border: 1.5px solid #334155;
-      background: transparent;
-      color: #94a3b8;
-      cursor: pointer;
-      font-size: 0.9rem;
-      font-weight: 600;
-      transition: all 0.25s;
-    }
+/* ===== BUTTONS ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { opacity: 0.9; color: #fff; }
+.btn-ghost { border-color: transparent; }
+.btn-ghost:hover { background: var(--row-hover); border-color: var(--border); color: var(--text); }
 
-    .tab-btn:hover {
-      border-color: #7c3aed;
-      color: #a78bfa;
-    }
+/* ===== LAYOUT ===== */
+.layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 0;
+  min-height: calc(100vh - 56px);
+}
 
-    .tab-btn.active {
-      background: linear-gradient(135deg, #7c3aed, #2563eb);
-      border-color: transparent;
-      color: #fff;
-      box-shadow: 0 0 20px rgba(124,58,237,0.4);
-    }
+/* ===== SIDEBAR ===== */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  max-height: calc(100vh - 56px);
+  position: sticky;
+  top: 56px;
+}
 
-    .range-row {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 16px;
-      padding: 0 20px 20px;
-      color: #94a3b8;
-      font-size: 0.9rem;
-    }
+.section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
 
-    .range-row input[type=range] {
-      accent-color: #7c3aed;
-      width: 180px;
-    }
+/* ===== PASTE AREA ===== */
+.paste-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--row-even);
+  position: relative;
+}
+.paste-zone:hover, .paste-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--row-hover);
+}
+.paste-zone-icon { font-size: 2rem; margin-bottom: 6px; }
+.paste-zone-text { font-size: 0.83rem; color: var(--muted); line-height: 1.5; }
+.paste-zone textarea {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  resize: none;
+}
 
-    .range-val {
-      color: #a78bfa;
-      font-weight: 700;
-      min-width: 28px;
-    }
+/* manual input */
+.textarea-wrap {
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.textarea-wrap:focus-within { border-color: var(--accent); }
+.data-input {
+  width: 100%;
+  min-height: 160px;
+  padding: 12px;
+  border: none;
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-family: 'Menlo', 'Consolas', monospace;
+  resize: vertical;
+}
+.textarea-footer {
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--row-even);
+}
+.input-hint { font-size: 0.72rem; color: var(--muted); }
 
-    main {
-      display: flex;
-      justify-content: center;
-      padding: 0 16px 60px;
-    }
+/* ===== SETTINGS ===== */
+.settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
-    .table-wrap {
-      overflow: auto;
-      max-width: 100%;
-      border-radius: 16px;
-      box-shadow: 0 0 60px rgba(124,58,237,0.15);
-    }
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.setting-label { font-size: 0.83rem; color: var(--text); flex: 1; }
+.setting-label small { display: block; font-size: 0.72rem; color: var(--muted); }
 
-    table {
-      border-collapse: collapse;
-      border-spacing: 0;
-    }
+select, input[type=text] {
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.2s;
+  cursor: pointer;
+}
+select:focus, input[type=text]:focus { border-color: var(--accent); }
 
-    td, th {
-      width: 52px;
-      height: 52px;
-      text-align: center;
-      font-size: 0.85rem;
-      font-weight: 600;
-      transition: transform 0.15s, box-shadow 0.15s;
-      position: relative;
-    }
+/* toggle */
+.toggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--border);
+  border-radius: 999px;
+  transition: 0.3s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  left: 3px; bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
 
-    td:hover {
-      transform: scale(1.15);
-      z-index: 10;
-      border-radius: 8px;
-    }
+/* color scheme chips */
+.scheme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.scheme-chip {
+  border-radius: 8px;
+  height: 40px;
+  cursor: pointer;
+  border: 2.5px solid transparent;
+  transition: all 0.2s;
+  overflow: hidden;
+  display: flex;
+}
+.scheme-chip.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,0.3); }
+.scheme-chip div { flex: 1; }
 
-    /* ヘッダー行/列 */
-    .hdr {
-      background: #1e1b4b;
-      color: #818cf8;
-      font-size: 0.8rem;
-      font-weight: 700;
-    }
+/* ===== MAIN ===== */
+.main {
+  padding: 24px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
-    /* 掛け算表のセル色 */
-    .mul-cell {
-      border: 1px solid rgba(255,255,255,0.03);
-    }
+/* ===== TOOLBAR ===== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.toolbar-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+.title-input {
+  font-size: 1.1rem;
+  font-weight: 700;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  padding: 2px 4px;
+  transition: border-color 0.2s;
+  min-width: 200px;
+}
+.title-input:focus { border-color: var(--accent); }
+.title-input::placeholder { color: var(--muted); font-weight: 400; }
 
-    /* 素数ハイライト */
-    .prime { outline: 2px solid #34d399; }
+/* ===== TABLE CONTAINER ===== */
+#table-container {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
 
-    /* 九九 */
-    .kuku-section {
-      display: grid;
-      grid-template-columns: repeat(9, 1fr);
-      gap: 8px;
-      padding: 8px;
-    }
+.table-title-bar {
+  padding: 16px 24px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.table-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.table-subtitle {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 3px;
+}
 
-    .kuku-card {
-      background: #1e1b4b;
-      border-radius: 12px;
-      padding: 12px 8px;
-      border: 1px solid #312e81;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
+.table-scroll { overflow-x: auto; }
 
-    .kuku-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 24px rgba(124,58,237,0.3);
-    }
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
 
-    .kuku-title {
-      text-align: center;
-      font-size: 1rem;
-      font-weight: 800;
-      margin-bottom: 8px;
-    }
+/* THEME: default blue */
+.theme-blue thead tr { background: #1e3a5f; }
+.theme-blue thead th { color: #bfdbfe; }
+.theme-blue tbody tr:hover { background: #eff6ff !important; }
+[data-theme="dark"] .theme-blue tbody tr:hover { background: #1e3a5f !important; }
 
-    .kuku-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.75rem;
-      padding: 2px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      color: #cbd5e1;
-    }
+/* THEME: slate */
+.theme-slate thead tr { background: #334155; }
+.theme-slate thead th { color: #e2e8f0; }
+.theme-slate tbody tr:hover { background: #f1f5f9 !important; }
+[data-theme="dark"] .theme-slate tbody tr:hover { background: #334155 !important; }
 
-    .kuku-row .ans { color: #a78bfa; font-weight: 700; }
+/* THEME: purple */
+.theme-purple thead tr { background: #4c1d95; }
+.theme-purple thead th { color: #ddd6fe; }
+.theme-purple tbody tr:hover { background: #f5f3ff !important; }
+[data-theme="dark"] .theme-purple tbody tr:hover { background: #2e1065 !important; }
 
-    /* 素数表 */
-    .prime-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      max-width: 860px;
-      justify-content: center;
-    }
+/* THEME: green */
+.theme-green thead tr { background: #14532d; }
+.theme-green thead th { color: #bbf7d0; }
+.theme-green tbody tr:hover { background: #f0fdf4 !important; }
+[data-theme="dark"] .theme-green tbody tr:hover { background: #14532d !important; }
 
-    .num-chip {
-      width: 52px;
-      height: 52px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      border: 1.5px solid transparent;
-      transition: transform 0.15s;
-      cursor: default;
-    }
+/* THEME: warm */
+.theme-warm thead tr { background: #7c2d12; }
+.theme-warm thead th { color: #fed7aa; }
+.theme-warm tbody tr:hover { background: #fff7ed !important; }
+[data-theme="dark"] .theme-warm tbody tr:hover { background: #7c2d12 !important; }
 
-    .num-chip:hover { transform: scale(1.1); }
+/* THEME: mono */
+.theme-mono thead tr { background: #111827; }
+.theme-mono thead th { color: #f9fafb; }
+.theme-mono tbody tr:hover { background: #f9fafb !important; }
+[data-theme="dark"] .theme-mono tbody tr:hover { background: #374151 !important; }
 
-    .num-chip.is-prime {
-      background: linear-gradient(135deg, #1e3a5f, #1a2e4a);
-      border-color: #3b82f6;
-      color: #60a5fa;
-      box-shadow: 0 0 10px rgba(59,130,246,0.3);
-    }
+thead th {
+  padding: 12px 16px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+}
+thead th.num { text-align: right; }
+thead th .sort-icon { opacity: 0.4; margin-left: 4px; }
+thead th.sorted .sort-icon { opacity: 1; }
 
-    .num-chip.is-comp {
-      background: #0f172a;
-      border-color: #1e293b;
-      color: #475569;
-    }
+tbody td {
+  padding: 10px 16px;
+  font-size: 0.87rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  transition: background 0.1s;
+}
 
-    .num-chip.is-1 {
-      background: #1c1917;
-      border-color: #292524;
-      color: #78716c;
-    }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) { background: var(--row-even); }
+tbody tr:nth-child(odd) { background: var(--row-odd); }
 
-    /* フィボナッチ */
-    .fib-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      max-width: 900px;
-      justify-content: center;
-    }
+td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: 'Menlo','Consolas', monospace;
+  color: var(--num-pos);
+}
+td.num.negative { color: var(--num-neg); }
+td.num.zero { color: var(--muted); }
 
-    .fib-chip {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-      padding: 10px 14px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #1a1a2e, #16213e);
-      border: 1.5px solid #0f3460;
-      min-width: 60px;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
+/* heat map overlay */
+td.heat span.bar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: rgba(59,130,246,0.12);
+  z-index: 0;
+  transition: width 0.3s;
+}
+td.heat {
+  position: relative;
+}
+td.heat .cell-val { position: relative; z-index: 1; }
 
-    .fib-chip:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 10px 30px rgba(52,211,153,0.2);
-      border-color: #34d399;
-    }
+/* stripe for index */
+td.row-idx {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding-right: 8px;
+  width: 40px;
+  background: var(--row-even) !important;
+  border-right: 1px solid var(--border);
+}
 
-    .fib-idx { font-size: 0.65rem; color: #64748b; }
-    .fib-val { font-size: 0.9rem; font-weight: 800; color: #34d399; }
+/* footer summary */
+.table-footer {
+  padding: 10px 24px;
+  border-top: 2px solid var(--border);
+  background: var(--row-even);
+  display: flex;
+  gap: 24px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.summary-item strong { color: var(--text); }
 
-    /* 凡例 */
-    .legend {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      padding: 0 20px 16px;
-      font-size: 0.8rem;
-      color: #64748b;
-      flex-wrap: wrap;
-    }
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: var(--muted);
+  text-align: center;
+  gap: 12px;
+}
+.empty-icon { font-size: 3.5rem; opacity: 0.3; }
+.empty-title { font-size: 1rem; font-weight: 600; }
+.empty-hint { font-size: 0.83rem; line-height: 1.7; max-width: 320px; }
 
-    .legend span { display: flex; align-items: center; gap: 6px; }
-    .dot { width: 12px; height: 12px; border-radius: 3px; }
-  </style>
+/* ===== TOAST ===== */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #1e293b;
+  color: #f1f5f9;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all 0.3s;
+  z-index: 999;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { max-height: none; position: static; }
+  .main { padding: 16px; }
+}
+
+/* ===== PRINT ===== */
+@media print {
+  .app-header, .sidebar, .toolbar { display: none !important; }
+  .main { padding: 0; }
+  #table-container { box-shadow: none; border-radius: 0; }
+}
+</style>
 </head>
 <body>
-<div class="bg-grid"></div>
 
-<header>
-  <h1>綺麗な数表</h1>
-  <p class="subtitle">美しく可視化された数の世界</p>
+<header class="app-header">
+  <div class="app-title">📊 数表メーカー</div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="toggleTheme()" id="theme-btn">🌙 ダーク</button>
+    <button class="btn" onclick="printTable()">🖨 印刷</button>
+    <button class="btn" onclick="copyImage()">📷 画像コピー</button>
+    <button class="btn btn-primary" onclick="downloadImage()">⬇ PNG保存</button>
+  </div>
 </header>
 
-<div class="controls">
-  <button class="tab-btn active" onclick="show('mul')">掛け算表</button>
-  <button class="tab-btn" onclick="show('kuku')">九九</button>
-  <button class="tab-btn" onclick="show('prime')">素数表</button>
-  <button class="tab-btn" onclick="show('fib')">フィボナッチ</button>
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div>
+      <div class="section-label">データ入力</div>
+      <div class="paste-zone" id="paste-zone" onclick="document.getElementById('raw-input').focus()">
+        <div class="paste-zone-icon">📋</div>
+        <div class="paste-zone-text">
+          ここをクリックしてデータを貼り付け<br>
+          <small>Excel・CSV・TSV・スペース区切り 対応</small>
+        </div>
+      </div>
+
+      <div class="textarea-wrap" style="margin-top:12px">
+        <textarea class="data-input" id="raw-input"
+          placeholder="例：
+名前&#9;売上&#9;前年比
+東京&#9;1200000&#9;1.12
+大阪&#9;980000&#9;0.95
+名古屋&#9;650000&#9;1.08"
+          oninput="onInputChange()"
+          onpaste="setTimeout(onInputChange,50)"></textarea>
+        <div class="textarea-footer">
+          <span class="input-hint" id="parse-hint">データを貼り付けてください</span>
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:0.72rem" onclick="clearData()">クリア</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div>
+      <div class="section-label">表のスタイル</div>
+      <div class="settings-grid">
+
+        <div>
+          <div class="section-label" style="margin-bottom:6px">カラーテーマ</div>
+          <div class="scheme-grid" id="scheme-grid">
+            <div class="scheme-chip active" data-scheme="blue" onclick="setScheme('blue')" title="ブルー">
+              <div style="background:#1e3a5f"></div><div style="background:#eff6ff"></div><div style="background:#bfdbfe"></div>
+            </div>
+            <div class="scheme-chip" data-scheme="slate" onclick="setScheme('slate')" title="スレート">
+              <div style="background:#334155"></div><div style="background:#f1f5f9"></div><div style="background:#94a3b8"></div>
+            </div>
+            <div class="scheme-chip" data-scheme="purple" onclick="setScheme('purple')" title="パープル">
+              <div style="background:#4c1d95"></div><div style="background:#f5f3ff"></div><div style="background:#ddd6fe"></div>
+            </div>
+            <div class="scheme-chip" data-scheme="green" onclick="setScheme('green')" title="グリーン">
+              <div style="background:#14532d"></div><div style="background:#f0fdf4"></div><div style="background:#bbf7d0"></div>
+            </div>
+            <div class="scheme-chip" data-scheme="warm" onclick="setScheme('warm')" title="ウォーム">
+              <div style="background:#7c2d12"></div><div style="background:#fff7ed"></div><div style="background:#fed7aa"></div>
+            </div>
+            <div class="scheme-chip" data-scheme="mono" onclick="setScheme('mono')" title="モノクロ">
+              <div style="background:#111827"></div><div style="background:#f9fafb"></div><div style="background:#6b7280"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <label class="setting-label">行番号を表示</label>
+          <label class="toggle">
+            <input type="checkbox" id="tog-rownum" onchange="render()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <label class="setting-label">
+            数値カラーバー
+            <small>数値列に棒グラフ背景を表示</small>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="tog-heat" onchange="render()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <label class="setting-label">合計行を追加</label>
+          <label class="toggle">
+            <input type="checkbox" id="tog-total" onchange="render()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <label class="setting-label">サマリーを表示</label>
+          <label class="toggle">
+            <input type="checkbox" id="tog-summary" checked onchange="render()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <label class="setting-label">
+            数値フォーマット
+            <small>数値の桁区切り・小数点</small>
+          </label>
+          <select id="num-format" onchange="render()">
+            <option value="auto">自動</option>
+            <option value="comma">カンマ区切り</option>
+            <option value="pct">%表示</option>
+            <option value="raw">そのまま</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <label class="setting-label">サブタイトル</label>
+          <input type="text" id="subtitle-input" placeholder="（任意）" style="width:160px" oninput="render()">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- サンプル -->
+    <div>
+      <div class="section-label">サンプルデータ</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button class="btn" style="justify-content:flex-start" onclick="loadSample('sales')">📈 売上表（月別）</button>
+        <button class="btn" style="justify-content:flex-start" onclick="loadSample('kpi')">📊 KPI一覧</button>
+        <button class="btn" style="justify-content:flex-start" onclick="loadSample('compare')">🔄 前年比較</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="toolbar">
+      <input class="title-input" id="title-input" placeholder="表のタイトルを入力..." oninput="render()" value="">
+      <div class="toolbar-sep"></div>
+      <button class="btn btn-ghost" id="sort-reset-btn" style="display:none" onclick="resetSort()">↺ ソート解除</button>
+    </div>
+
+    <div id="table-container">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">データを貼り付けてください</div>
+        <div class="empty-hint">
+          ExcelやGoogleスプレッドシートからコピーしたデータ、<br>
+          CSVやTSV形式のテキストを左側に貼り付けると<br>
+          レポート用の綺麗な表に変換します。
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<div id="section-mul">
-  <div class="range-row">
-    <label>最大値</label>
-    <input type="range" min="5" max="20" value="12" id="mul-range" oninput="buildMul(this.value)">
-    <span class="range-val" id="mul-val">12</span>
-  </div>
-  <main><div class="table-wrap" id="mul-table"></div></main>
-</div>
-
-<div id="section-kuku" style="display:none">
-  <main><div class="kuku-section" id="kuku-grid"></div></main>
-</div>
-
-<div id="section-prime" style="display:none">
-  <div class="range-row">
-    <label>最大値</label>
-    <input type="range" min="50" max="300" value="100" step="10" id="prime-range" oninput="buildPrime(this.value)">
-    <span class="range-val" id="prime-val">100</span>
-  </div>
-  <div class="legend">
-    <span><div class="dot" style="background:#3b82f6;border:1.5px solid #60a5fa"></div>素数</span>
-    <span><div class="dot" style="background:#0f172a;border:1.5px solid #1e293b"></div>合成数</span>
-    <span><div class="dot" style="background:#1c1917;border:1.5px solid #292524"></div>1</span>
-  </div>
-  <main><div class="prime-grid" id="prime-grid"></div></main>
-</div>
-
-<div id="section-fib" style="display:none">
-  <div class="range-row">
-    <label>項数</label>
-    <input type="range" min="5" max="30" value="15" id="fib-range" oninput="buildFib(this.value)">
-    <span class="range-val" id="fib-val">15</span>
-  </div>
-  <main><div class="fib-row" id="fib-row"></div></main>
-</div>
+<div class="toast" id="toast"></div>
 
 <script>
-const sections = ['mul','kuku','prime','fib'];
+// ===== STATE =====
+let parsedData = null;   // { headers: [], rows: [] }
+let currentScheme = 'blue';
+let sortCol = -1;
+let sortAsc = true;
+let colTypes = [];       // 'num' | 'text'
 
-function show(id) {
-  sections.forEach(s => {
-    document.getElementById('section-'+s).style.display = s===id ? '' : 'none';
-  });
-  document.querySelectorAll('.tab-btn').forEach((btn,i) => {
-    btn.classList.toggle('active', sections[i]===id);
-  });
-}
+// ===== PARSE =====
+function parseData(raw) {
+  raw = raw.trim();
+  if (!raw) return null;
 
-// --- 掛け算表 ---
-function hsl(n, max) {
-  const h = (n/max) * 260;
-  return `hsl(${h},70%,${20 + (n/max)*18}%)`;
-}
+  // detect delimiter
+  const lines = raw.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 1) return null;
 
-function buildMul(n) {
-  n = +n;
-  document.getElementById('mul-val').textContent = n;
-  const max = n*n;
-  let html = '<table>';
-  html += '<tr><th class="hdr" style="background:#0f172a"></th>';
-  for(let j=1;j<=n;j++) html += `<th class="hdr">${j}</th>`;
-  html += '</tr>';
-  for(let i=1;i<=n;i++){
-    html += `<tr><th class="hdr">${i}</th>`;
-    for(let j=1;j<=n;j++){
-      const v=i*j;
-      const bg = hsl(v,max);
-      html += `<td class="mul-cell" style="background:${bg};color:#e2e8f0" title="${i}×${j}=${v}">${v}</td>`;
+  // try TSV first, then CSV, then spaces
+  let delim = '\t';
+  const tabCounts = lines.map(l => (l.match(/\t/g)||[]).length);
+  const commaCounts = lines.map(l => (l.match(/,/g)||[]).length);
+  const maxTab = Math.max(...tabCounts);
+  const maxComma = Math.max(...commaCounts);
+  if (maxTab === 0 && maxComma === 0) delim = /\s{2,}/;
+  else if (maxComma > maxTab) delim = ',';
+
+  function splitLine(line) {
+    if (typeof delim === 'string') {
+      return line.split(delim).map(c => c.trim().replace(/^["']|["']$/g, ''));
+    } else {
+      return line.trim().split(delim).map(c => c.trim());
     }
+  }
+
+  const rows = lines.map(splitLine);
+  const maxCols = Math.max(...rows.map(r => r.length));
+
+  // pad rows
+  rows.forEach(r => { while(r.length < maxCols) r.push(''); });
+
+  // first row as header
+  const headers = rows[0];
+  const dataRows = rows.slice(1);
+
+  // detect col types
+  colTypes = headers.map((_, ci) => {
+    const vals = dataRows.map(r => r[ci]).filter(v => v !== '');
+    const numCount = vals.filter(v => !isNaN(parseFloat(v.replace(/,/g,'').replace('%',''))) && v.trim() !== '').length;
+    return numCount / (vals.length || 1) > 0.6 ? 'num' : 'text';
+  });
+
+  return { headers, rows: dataRows };
+}
+
+function toNum(str) {
+  if (!str) return null;
+  const cleaned = str.replace(/,/g, '').replace('%', '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+
+// ===== FORMAT =====
+function formatCell(val, colIdx) {
+  if (colTypes[colIdx] !== 'num') return { display: val, raw: val, isNum: false };
+  const fmt = document.getElementById('num-format').value;
+  const n = toNum(val);
+  if (n === null) return { display: val, raw: val, isNum: false };
+
+  let display = val;
+  if (fmt === 'comma' || (fmt === 'auto' && Math.abs(n) >= 1000)) {
+    display = n.toLocaleString('ja-JP', { maximumFractionDigits: 4 });
+  } else if (fmt === 'pct') {
+    display = (n * 100).toFixed(1) + '%';
+  } else {
+    // auto: if original has comma treat as comma
+    if (val.includes(',')) display = n.toLocaleString('ja-JP');
+    else display = val;
+  }
+  return { display, raw: n, isNum: true };
+}
+
+// ===== RENDER =====
+function render() {
+  if (!parsedData) return;
+  const { headers, rows } = parsedData;
+
+  // sort
+  let displayRows = [...rows];
+  if (sortCol >= 0) {
+    displayRows.sort((a, b) => {
+      const av = colTypes[sortCol] === 'num' ? (toNum(a[sortCol]) ?? -Infinity) : a[sortCol];
+      const bv = colTypes[sortCol] === 'num' ? (toNum(b[sortCol]) ?? -Infinity) : b[sortCol];
+      if (av < bv) return sortAsc ? -1 : 1;
+      if (av > bv) return sortAsc ? 1 : -1;
+      return 0;
+    });
+  }
+
+  // heat: per-col min/max for numeric
+  const colMinMax = headers.map((_, ci) => {
+    if (colTypes[ci] !== 'num') return null;
+    const vals = rows.map(r => toNum(r[ci])).filter(v => v !== null);
+    if (!vals.length) return null;
+    return { min: Math.min(...vals), max: Math.max(...vals) };
+  });
+
+  // totals
+  const totals = document.getElementById('tog-total').checked
+    ? headers.map((_, ci) => {
+        if (colTypes[ci] !== 'num') return null;
+        const vals = rows.map(r => toNum(r[ci])).filter(v => v !== null);
+        return vals.reduce((a,b) => a+b, 0);
+      })
+    : null;
+
+  const showRowNum = document.getElementById('tog-rownum').checked;
+  const showHeat = document.getElementById('tog-heat').checked;
+  const showSummary = document.getElementById('tog-summary').checked;
+  const title = document.getElementById('title-input').value;
+  const subtitle = document.getElementById('subtitle-input').value;
+
+  let html = '';
+
+  // title bar
+  if (title || subtitle) {
+    html += `<div class="table-title-bar">
+      ${title ? `<div class="table-title">${escHtml(title)}</div>` : ''}
+      ${subtitle ? `<div class="table-subtitle">${escHtml(subtitle)}</div>` : ''}
+    </div>`;
+  }
+
+  html += `<div class="table-scroll"><table class="theme-${currentScheme}">`;
+
+  // thead
+  html += '<thead><tr>';
+  if (showRowNum) html += '<th></th>';
+  headers.forEach((h, ci) => {
+    const isNum = colTypes[ci] === 'num';
+    const isSorted = sortCol === ci;
+    const icon = isSorted ? (sortAsc ? '↑' : '↓') : '↕';
+    html += `<th class="${isNum?'num':''} ${isSorted?'sorted':''}" onclick="doSort(${ci})">
+      ${escHtml(h)} <span class="sort-icon">${icon}</span>
+    </th>`;
+  });
+  html += '</tr></thead>';
+
+  // tbody
+  html += '<tbody>';
+  displayRows.forEach((row, ri) => {
+    html += '<tr>';
+    if (showRowNum) html += `<td class="row-idx">${ri+1}</td>`;
+    row.forEach((val, ci) => {
+      const { display, raw, isNum } = formatCell(val, ci);
+      let cls = isNum ? 'num' : '';
+      if (isNum) {
+        if (raw < 0) cls += ' negative';
+        else if (raw === 0) cls += ' zero';
+      }
+
+      if (showHeat && isNum && colMinMax[ci]) {
+        const { min, max } = colMinMax[ci];
+        const pct = max !== min ? Math.round((raw - min) / (max - min) * 100) : 0;
+        cls += ' heat';
+        html += `<td class="${cls}"><span class="bar" style="width:${pct}%"></span><span class="cell-val">${escHtml(display)}</span></td>`;
+      } else {
+        html += `<td class="${cls}">${escHtml(display)}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  // total row
+  if (totals) {
+    html += '<tr style="font-weight:700;background:var(--row-even);border-top:2px solid var(--border)">';
+    if (showRowNum) html += '<td class="row-idx">計</td>';
+    totals.forEach((t, ci) => {
+      if (t === null) {
+        html += `<td style="color:var(--muted);font-size:0.8rem">合計</td>`;
+      } else {
+        const fmt = document.getElementById('num-format').value;
+        let display;
+        if (fmt === 'comma' || (fmt === 'auto' && Math.abs(t) >= 1000)) {
+          display = t.toLocaleString('ja-JP', { maximumFractionDigits: 4 });
+        } else {
+          display = t.toString();
+        }
+        html += `<td class="num">${escHtml(display)}</td>`;
+      }
+    });
     html += '</tr>';
   }
-  html += '</table>';
-  document.getElementById('mul-table').innerHTML = html;
-}
 
-// --- 九九 ---
-function buildKuku() {
-  const colors = ['#7c3aed','#2563eb','#0891b2','#059669','#d97706','#dc2626','#db2777','#9333ea','#4f46e5'];
-  let html = '';
-  for(let i=1;i<=9;i++){
-    html += `<div class="kuku-card">
-      <div class="kuku-title" style="color:${colors[i-1]}">${i}の段</div>`;
-    for(let j=1;j<=9;j++){
-      html += `<div class="kuku-row"><span>${i}×${j}</span><span class="ans">${i*j}</span></div>`;
-    }
-    html += '</div>';
-  }
-  document.getElementById('kuku-grid').innerHTML = html;
-}
+  html += '</tbody></table></div>';
 
-// --- 素数表 ---
-function sieve(n) {
-  const a = new Uint8Array(n+1).fill(1);
-  a[0]=a[1]=0;
-  for(let i=2;i*i<=n;i++) if(a[i]) for(let j=i*i;j<=n;j+=i) a[j]=0;
-  return a;
-}
-
-function buildPrime(n) {
-  n = +n;
-  document.getElementById('prime-val').textContent = n;
-  const isPrime = sieve(n);
-  let html = '';
-  for(let i=1;i<=n;i++){
-    let cls = i===1 ? 'is-1' : isPrime[i] ? 'is-prime' : 'is-comp';
-    html += `<div class="num-chip ${cls}">${i}</div>`;
-  }
-  document.getElementById('prime-grid').innerHTML = html;
-}
-
-// --- フィボナッチ ---
-function buildFib(n) {
-  n = +n;
-  document.getElementById('fib-val').textContent = n;
-  let a=0,b=1,html='';
-  for(let i=1;i<=n;i++){
-    const alpha = 0.3 + 0.7*(i/n);
-    html += `<div class="fib-chip" style="opacity:${alpha}">
-      <span class="fib-idx">F(${i})</span>
-      <span class="fib-val">${a}</span>
+  // summary footer
+  if (showSummary) {
+    const numCols = colTypes.filter(t => t === 'num').length;
+    const today = new Date().toLocaleDateString('ja-JP');
+    html += `<div class="table-footer">
+      <span><strong>${displayRows.length}</strong> 行 × <strong>${headers.length}</strong> 列</span>
+      <span>数値列: <strong>${numCols}</strong></span>
+      ${sortCol >= 0 ? `<span>ソート: <strong>${escHtml(headers[sortCol])}</strong> ${sortAsc?'昇順':'降順'}</span>` : ''}
+      <span style="margin-left:auto">作成日: ${today}</span>
     </div>`;
-    [a,b]=[b,a+b];
   }
-  document.getElementById('fib-row').innerHTML = html;
+
+  const container = document.getElementById('table-container');
+  container.innerHTML = html;
 }
 
-// 初期描画
-buildMul(12);
-buildKuku();
-buildPrime(100);
-buildFib(15);
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ===== SORT =====
+function doSort(ci) {
+  if (sortCol === ci) {
+    if (sortAsc) { sortAsc = false; }
+    else { sortCol = -1; sortAsc = true; }
+  } else {
+    sortCol = ci; sortAsc = true;
+  }
+  document.getElementById('sort-reset-btn').style.display = sortCol >= 0 ? '' : 'none';
+  render();
+}
+function resetSort() {
+  sortCol = -1; sortAsc = true;
+  document.getElementById('sort-reset-btn').style.display = 'none';
+  render();
+}
+
+// ===== INPUT =====
+function onInputChange() {
+  const raw = document.getElementById('raw-input').value;
+  parsedData = parseData(raw);
+  const hint = document.getElementById('parse-hint');
+  const empty = document.getElementById('empty-state');
+
+  if (!parsedData) {
+    hint.textContent = 'データを貼り付けてください';
+    if (empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  const { headers, rows } = parsedData;
+  const numCols = colTypes.filter(t => t === 'num').length;
+  hint.textContent = `${rows.length}行 × ${headers.length}列 を検出（数値列: ${numCols}）`;
+  sortCol = -1; sortAsc = true;
+  render();
+}
+
+function clearData() {
+  document.getElementById('raw-input').value = '';
+  parsedData = null;
+  colTypes = [];
+  sortCol = -1;
+  document.getElementById('parse-hint').textContent = 'データを貼り付けてください';
+  document.getElementById('sort-reset-btn').style.display = 'none';
+  const container = document.getElementById('table-container');
+  container.innerHTML = `<div class="empty-state" id="empty-state">
+    <div class="empty-icon">📋</div>
+    <div class="empty-title">データを貼り付けてください</div>
+    <div class="empty-hint">ExcelやGoogleスプレッドシートからコピーしたデータ、<br>CSVやTSV形式のテキストを左側に貼り付けると<br>レポート用の綺麗な表に変換します。</div>
+  </div>`;
+}
+
+// ===== SCHEME =====
+function setScheme(s) {
+  currentScheme = s;
+  document.querySelectorAll('.scheme-chip').forEach(el => {
+    el.classList.toggle('active', el.dataset.scheme === s);
+  });
+  render();
+}
+
+// ===== THEME =====
+function toggleTheme() {
+  const isDark = document.body.getAttribute('data-theme') === 'dark';
+  document.body.setAttribute('data-theme', isDark ? '' : 'dark');
+  document.getElementById('theme-btn').textContent = isDark ? '🌙 ダーク' : '☀ ライト';
+}
+
+// ===== EXPORT =====
+function printTable() { window.print(); }
+
+async function downloadImage() {
+  const el = document.getElementById('table-container');
+  if (!parsedData) { showToast('データがありません'); return; }
+  showToast('画像を生成中...');
+  const canvas = await html2canvas(el, { scale: 2, backgroundColor: null });
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = (document.getElementById('title-input').value || '数表') + '.png';
+  a.click();
+  showToast('PNG保存しました ✓');
+}
+
+async function copyImage() {
+  const el = document.getElementById('table-container');
+  if (!parsedData) { showToast('データがありません'); return; }
+  try {
+    showToast('クリップボードにコピー中...');
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: null });
+    canvas.toBlob(async blob => {
+      await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
+      showToast('画像をコピーしました ✓');
+    });
+  } catch(e) {
+    showToast('コピー失敗（ブラウザ制限）');
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ===== SAMPLES =====
+const SAMPLES = {
+  sales: `月\t売上（万円）\t前月比\t目標達成率
+1月\t1,234\t-\t98.2%
+2月\t1,189\t-3.6%\t94.8%
+3月\t1,456\t22.5%\t116.0%
+4月\t1,320\t-9.3%\t105.2%
+5月\t1,098\t-16.8%\t87.5%
+6月\t1,567\t42.7%\t124.9%
+7月\t1,890\t20.6%\t150.5%
+8月\t1,723\t-8.8%\t137.2%
+9月\t1,445\t-16.1%\t115.1%
+10月\t1,612\t11.6%\t128.4%
+11月\t1,789\t11.0%\t142.5%
+12月\t2,134\t19.3%\t170.0%`,
+
+  kpi: `指標\t今期\t前期\t差分\t評価
+新規顧客数\t342\t298\t+44\t↑
+継続率\t87.3%\t84.1%\t+3.2%\t↑
+平均単価\t24,800\t22,400\t+2,400\t↑
+NPS\t62\t58\t+4\t↑
+解約率\t2.1%\t3.4%\t-1.3%\t↑
+問い合わせ対応時間\t4.2時間\t6.8時間\t-2.6時間\t↑
+従業員満足度\t78\t71\t+7\t↑`,
+
+  compare: `部門\t2023年売上\t2024年売上\t増減\t成長率
+東日本\t45,200,000\t51,800,000\t6,600,000\t14.6%
+西日本\t38,900,000\t41,200,000\t2,300,000\t5.9%
+中部\t22,400,000\t25,600,000\t3,200,000\t14.3%
+北海道\t8,700,000\t9,100,000\t400,000\t4.6%
+九州\t14,300,000\t15,800,000\t1,500,000\t10.5%
+海外\t5,600,000\t9,400,000\t3,800,000\t67.9%`
+};
+
+function loadSample(key) {
+  document.getElementById('raw-input').value = SAMPLES[key];
+  const titles = { sales: '月別売上実績', kpi: 'KPI ダッシュボード', compare: '部門別前年比較' };
+  document.getElementById('title-input').value = titles[key];
+  onInputChange();
+}
+
+// ===== DRAG & DROP =====
+const dz = document.getElementById('paste-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('raw-input').value = ev.target.result;
+      onInputChange();
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+});
+
+// global paste shortcut
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+    document.getElementById('raw-input').focus();
+  }
+});
 </script>
 </body>
 </html>
