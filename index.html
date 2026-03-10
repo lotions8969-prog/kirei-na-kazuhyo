@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>数表メーカー</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root {
   --bg: #f4f6f9;
@@ -488,6 +489,43 @@ td.row-idx {
   .main { padding: 16px; }
 }
 
+/* ===== OCR OVERLAY ===== */
+.ocr-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,26,0.75);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  backdrop-filter: blur(4px);
+}
+.ocr-overlay.show { display: flex; }
+.ocr-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 40px;
+  text-align: center;
+  min-width: 280px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.ocr-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.ocr-title { font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.ocr-progress { font-size: 0.82rem; color: var(--muted); }
+.ocr-bar-wrap { height: 4px; background: var(--border); border-radius: 9px; margin-top: 12px; overflow: hidden; }
+.ocr-bar { height: 100%; background: var(--accent); border-radius: 9px; transition: width 0.3s; width: 0%; }
+
 /* ===== PRINT ===== */
 @media print {
   .app-header, .sidebar, .toolbar { display: none !important; }
@@ -518,7 +556,7 @@ td.row-idx {
         <div class="paste-zone-icon">📋</div>
         <div class="paste-zone-text">
           ここをクリックしてデータを貼り付け<br>
-          <small>Excel・CSV・TSV・スペース区切り 対応</small>
+          <small>Excel・CSV・TSV・スペース区切り・<strong>スクリーンショット画像</strong> 対応</small>
         </div>
       </div>
 
@@ -604,6 +642,21 @@ td.row-idx {
 
         <div class="setting-row">
           <label class="setting-label">
+            区切り文字
+            <small>自動検出がうまくいかない時に変更</small>
+          </label>
+          <select id="delim-select" onchange="onInputChange()">
+            <option value="auto">自動</option>
+            <option value="tab">タブ</option>
+            <option value="comma">カンマ</option>
+            <option value="space">スペース</option>
+            <option value="pipe">| パイプ</option>
+            <option value="semi">; セミコロン</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <label class="setting-label">
             数値フォーマット
             <small>数値の桁区切り・小数点</small>
           </label>
@@ -658,6 +711,14 @@ td.row-idx {
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="ocr-overlay" id="ocr-overlay">
+  <div class="ocr-box">
+    <div class="ocr-spinner"></div>
+    <div class="ocr-title">画像を解析中...</div>
+    <div class="ocr-progress" id="ocr-progress">テキストを認識しています</div>
+    <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocr-bar"></div></div>
+  </div>
+</div>
 
 <script>
 // ===== STATE =====
@@ -672,45 +733,109 @@ function parseData(raw) {
   raw = raw.trim();
   if (!raw) return null;
 
-  // detect delimiter
   const lines = raw.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 1) return null;
 
-  // try TSV first, then CSV, then spaces
-  let delim = '\t';
-  const tabCounts = lines.map(l => (l.match(/\t/g)||[]).length);
-  const commaCounts = lines.map(l => (l.match(/,/g)||[]).length);
-  const maxTab = Math.max(...tabCounts);
-  const maxComma = Math.max(...commaCounts);
-  if (maxTab === 0 && maxComma === 0) delim = /\s{2,}/;
-  else if (maxComma > maxTab) delim = ',';
+  // ---- 区切り文字の決定 ----
+  const manualDelim = document.getElementById('delim-select')
+    ? document.getElementById('delim-select').value
+    : 'auto';
 
-  function splitLine(line) {
-    if (typeof delim === 'string') {
-      return line.split(delim).map(c => c.trim().replace(/^["']|["']$/g, ''));
+  let splitFn;
+
+  if (manualDelim !== 'auto') {
+    // 手動指定
+    const delimMap = { tab: '\t', comma: ',', space: /\s+/, pipe: '|', semi: ';' };
+    const d = delimMap[manualDelim];
+    splitFn = line => {
+      const parts = typeof d === 'string'
+        ? line.split(d)
+        : line.trim().split(d);
+      return parts.map(c => c.trim().replace(/^["']|["']$/g, ''));
+    };
+  } else {
+    // 自動検出
+    const medianColCount = arr => {
+      const sorted = [...arr].sort((a,b)=>a-b);
+      return sorted[Math.floor(sorted.length/2)];
+    };
+
+    const tabCounts   = lines.map(l => (l.match(/\t/g)||[]).length);
+    const commaCounts = lines.map(l => (l.match(/,/g)||[]).length);
+    const pipeCounts  = lines.map(l => (l.match(/\|/g)||[]).length);
+    const semiCounts  = lines.map(l => (l.match(/;/g)||[]).length);
+    const maxTab   = Math.max(...tabCounts);
+    const maxComma = Math.max(...commaCounts);
+    const maxPipe  = Math.max(...pipeCounts);
+    const maxSemi  = Math.max(...semiCounts);
+
+    if (maxTab > 0) {
+      // TSV（Excelコピー等）
+      splitFn = line => line.split('\t').map(c => c.trim().replace(/^["']|["']$/g, ''));
+    } else if (maxComma > 0 && maxComma >= maxPipe && maxComma >= maxSemi) {
+      // CSV（クォート対応）
+      splitFn = line => {
+        const result = []; let cur = ''; let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { inQ = !inQ; continue; }
+          if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+          else cur += ch;
+        }
+        result.push(cur.trim());
+        return result;
+      };
+    } else if (maxPipe > 0 && maxPipe >= maxSemi) {
+      splitFn = line => line.split('|').map(c => c.trim()).filter((c,i,a)=> !(i===0&&c==='') && !(i===a.length-1&&c===''));
+    } else if (maxSemi > 0) {
+      splitFn = line => line.split(';').map(c => c.trim());
     } else {
-      return line.trim().split(delim).map(c => c.trim());
+      // スペース区切り: まず2+スペースで試し、列数が安定しなければ1+スペースにフォールバック
+      const trySplit = (lines, re) => lines.map(l => l.trim().split(re).map(c=>c.trim()).filter(c=>c!==''));
+      const rows2  = trySplit(lines, /\s{2,}/);
+      const rows1  = trySplit(lines, /\s+/);
+      const med2   = medianColCount(rows2.map(r=>r.length));
+      const med1   = medianColCount(rows1.map(r=>r.length));
+      const dev2   = rows2.reduce((s,r)=>s+Math.abs(r.length-med2),0);
+      const dev1   = rows1.reduce((s,r)=>s+Math.abs(r.length-med1),0);
+
+      // 列数が1より多く、かつ列数のばらつきが小さい方を選ぶ
+      let chosen;
+      if (med2 > 1 && dev2 <= dev1) chosen = rows2;
+      else if (med1 > 1) chosen = rows1;
+      else chosen = rows1; // 最終フォールバック
+
+      // splitFn は不要（行ごとに既に分割済みなので直接使う）
+      const maxCols2 = Math.max(...chosen.map(r=>r.length));
+      chosen.forEach(r => { while(r.length < maxCols2) r.push(''); });
+      const headers = chosen[0];
+      const dataRows = chosen.slice(1);
+      colTypes = detectColTypes(headers, dataRows);
+      return { headers, rows: dataRows };
     }
   }
 
-  const rows = lines.map(splitLine);
+  // splitFn が決まっている場合の共通処理
+  const rows = lines.map(splitFn);
   const maxCols = Math.max(...rows.map(r => r.length));
-
-  // pad rows
   rows.forEach(r => { while(r.length < maxCols) r.push(''); });
 
-  // first row as header
-  const headers = rows[0];
+  const headers  = rows[0];
   const dataRows = rows.slice(1);
-
-  // detect col types
-  colTypes = headers.map((_, ci) => {
-    const vals = dataRows.map(r => r[ci]).filter(v => v !== '');
-    const numCount = vals.filter(v => !isNaN(parseFloat(v.replace(/,/g,'').replace('%',''))) && v.trim() !== '').length;
-    return numCount / (vals.length || 1) > 0.6 ? 'num' : 'text';
-  });
-
+  colTypes = detectColTypes(headers, dataRows);
   return { headers, rows: dataRows };
+}
+
+function detectColTypes(headers, dataRows) {
+  return headers.map((_, ci) => {
+    const vals = dataRows.map(r => r[ci]).filter(v => v !== '');
+    if (!vals.length) return 'text';
+    const numCount = vals.filter(v => {
+      const c = v.replace(/,/g,'').replace(/%/,'').replace(/[+▲▼±]/g,'').trim();
+      return c !== '' && !isNaN(parseFloat(c));
+    }).length;
+    return numCount / vals.length > 0.6 ? 'num' : 'text';
+  });
 }
 
 function toNum(str) {
@@ -1039,13 +1164,24 @@ dz.addEventListener('drop', e => {
   }
 });
 
-// ページのどこでも Cmd+V / Ctrl+V で貼り付け可能にする
-document.addEventListener('paste', e => {
+// ページのどこでも貼り付け可能にする（テキスト＆画像）
+document.addEventListener('paste', async e => {
   const target = e.target;
   const ta = document.getElementById('raw-input');
-  // テキストエリアや入力欄にフォーカスがある場合はブラウザのデフォルト動作に任せる
-  if (target === ta || target.tagName === 'INPUT') return;
 
+  const items = Array.from(e.clipboardData.items);
+  const imageItem = items.find(it => it.type.startsWith('image/'));
+
+  if (imageItem) {
+    // ---- 画像ペースト → OCR ----
+    e.preventDefault();
+    const blob = imageItem.getAsFile();
+    await ocrImage(blob);
+    return;
+  }
+
+  // ---- テキストペースト ----
+  if (target === ta || target.tagName === 'INPUT') return; // 既にフォーカスあり→ブラウザ任せ
   const text = e.clipboardData.getData('text/plain');
   if (!text) return;
   e.preventDefault();
@@ -1054,6 +1190,58 @@ document.addEventListener('paste', e => {
   onInputChange();
   showToast('データを貼り付けました ✓');
 });
+
+// ===== OCR =====
+async function ocrImage(blob) {
+  const overlay = document.getElementById('ocr-overlay');
+  const progressEl = document.getElementById('ocr-progress');
+  const barEl = document.getElementById('ocr-bar');
+  overlay.classList.add('show');
+
+  try {
+    const worker = await Tesseract.createWorker('jpn+eng', 1, {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          const pct = Math.round((m.progress || 0) * 100);
+          barEl.style.width = pct + '%';
+          progressEl.textContent = `テキスト認識中... ${pct}%`;
+        } else {
+          progressEl.textContent = m.status;
+        }
+      }
+    });
+
+    const { data: { text } } = await worker.recognize(blob);
+    await worker.terminate();
+
+    // OCR結果をテキストエリアに流し込む
+    const cleaned = cleanOcrText(text);
+    const ta = document.getElementById('raw-input');
+    ta.value = cleaned;
+    onInputChange();
+    showToast('画像のOCR完了 ✓');
+  } catch(err) {
+    console.error(err);
+    showToast('OCR失敗: ' + err.message);
+  } finally {
+    overlay.classList.remove('show');
+  }
+}
+
+function cleanOcrText(raw) {
+  return raw
+    .split(/\r?\n/)
+    .map(l => l
+      // 全角スペース→半角
+      .replace(/　/g, ' ')
+      // OCR由来の縦棒（表の罫線）を除去
+      .replace(/[|｜]/g, '\t')
+      // 連続スペース正規化（先頭・末尾除く）
+      .trim()
+    )
+    .filter(l => l.length > 0)
+    .join('\n');
+}
 </script>
 </body>
 </html>
