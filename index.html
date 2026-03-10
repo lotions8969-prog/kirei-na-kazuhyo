@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>綺麗な数表</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0a0a1a;
+      font-family: 'Segoe UI', sans-serif;
+      overflow-x: hidden;
+    }
+
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(100,100,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(100,100,255,0.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    header {
+      text-align: center;
+      padding: 48px 20px 24px;
+      position: relative;
+    }
+
+    h1 {
+      font-size: 2.8rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 0.05em;
+    }
+
+    .subtitle {
+      color: #64748b;
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      padding: 20px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 10px 24px;
+      border-radius: 9999px;
+      border: 1.5px solid #334155;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.25s;
+    }
+
+    .tab-btn:hover {
+      border-color: #7c3aed;
+      color: #a78bfa;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 0 20px rgba(124,58,237,0.4);
+    }
+
+    .range-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      padding: 0 20px 20px;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .range-row input[type=range] {
+      accent-color: #7c3aed;
+      width: 180px;
+    }
+
+    .range-val {
+      color: #a78bfa;
+      font-weight: 700;
+      min-width: 28px;
+    }
+
+    main {
+      display: flex;
+      justify-content: center;
+      padding: 0 16px 60px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 0 60px rgba(124,58,237,0.15);
+    }
+
+    table {
+      border-collapse: collapse;
+      border-spacing: 0;
+    }
+
+    td, th {
+      width: 52px;
+      height: 52px;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+    }
+
+    td:hover {
+      transform: scale(1.15);
+      z-index: 10;
+      border-radius: 8px;
+    }
+
+    /* ヘッダー行/列 */
+    .hdr {
+      background: #1e1b4b;
+      color: #818cf8;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    /* 掛け算表のセル色 */
+    .mul-cell {
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+
+    /* 素数ハイライト */
+    .prime { outline: 2px solid #34d399; }
+
+    /* 九九 */
+    .kuku-section {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 8px;
+      padding: 8px;
+    }
+
+    .kuku-card {
+      background: #1e1b4b;
+      border-radius: 12px;
+      padding: 12px 8px;
+      border: 1px solid #312e81;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .kuku-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(124,58,237,0.3);
+    }
+
+    .kuku-title {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .kuku-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: #cbd5e1;
+    }
+
+    .kuku-row .ans { color: #a78bfa; font-weight: 700; }
+
+    /* 素数表 */
+    .prime-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 860px;
+      justify-content: center;
+    }
+
+    .num-chip {
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      border: 1.5px solid transparent;
+      transition: transform 0.15s;
+      cursor: default;
+    }
+
+    .num-chip:hover { transform: scale(1.1); }
+
+    .num-chip.is-prime {
+      background: linear-gradient(135deg, #1e3a5f, #1a2e4a);
+      border-color: #3b82f6;
+      color: #60a5fa;
+      box-shadow: 0 0 10px rgba(59,130,246,0.3);
+    }
+
+    .num-chip.is-comp {
+      background: #0f172a;
+      border-color: #1e293b;
+      color: #475569;
+    }
+
+    .num-chip.is-1 {
+      background: #1c1917;
+      border-color: #292524;
+      color: #78716c;
+    }
+
+    /* フィボナッチ */
+    .fib-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      max-width: 900px;
+      justify-content: center;
+    }
+
+    .fib-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 1.5px solid #0f3460;
+      min-width: 60px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .fib-chip:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 30px rgba(52,211,153,0.2);
+      border-color: #34d399;
+    }
+
+    .fib-idx { font-size: 0.65rem; color: #64748b; }
+    .fib-val { font-size: 0.9rem; font-weight: 800; color: #34d399; }
+
+    /* 凡例 */
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      padding: 0 20px 16px;
+      font-size: 0.8rem;
+      color: #64748b;
+      flex-wrap: wrap;
+    }
+
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 12px; height: 12px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<header>
+  <h1>綺麗な数表</h1>
+  <p class="subtitle">美しく可視化された数の世界</p>
+</header>
+
+<div class="controls">
+  <button class="tab-btn active" onclick="show('mul')">掛け算表</button>
+  <button class="tab-btn" onclick="show('kuku')">九九</button>
+  <button class="tab-btn" onclick="show('prime')">素数表</button>
+  <button class="tab-btn" onclick="show('fib')">フィボナッチ</button>
+</div>
+
+<div id="section-mul">
+  <div class="range-row">
+    <label>最大値</label>
+    <input type="range" min="5" max="20" value="12" id="mul-range" oninput="buildMul(this.value)">
+    <span class="range-val" id="mul-val">12</span>
+  </div>
+  <main><div class="table-wrap" id="mul-table"></div></main>
+</div>
+
+<div id="section-kuku" style="display:none">
+  <main><div class="kuku-section" id="kuku-grid"></div></main>
+</div>
+
+<div id="section-prime" style="display:none">
+  <div class="range-row">
+    <label>最大値</label>
+    <input type="range" min="50" max="300" value="100" step="10" id="prime-range" oninput="buildPrime(this.value)">
+    <span class="range-val" id="prime-val">100</span>
+  </div>
+  <div class="legend">
+    <span><div class="dot" style="background:#3b82f6;border:1.5px solid #60a5fa"></div>素数</span>
+    <span><div class="dot" style="background:#0f172a;border:1.5px solid #1e293b"></div>合成数</span>
+    <span><div class="dot" style="background:#1c1917;border:1.5px solid #292524"></div>1</span>
+  </div>
+  <main><div class="prime-grid" id="prime-grid"></div></main>
+</div>
+
+<div id="section-fib" style="display:none">
+  <div class="range-row">
+    <label>項数</label>
+    <input type="range" min="5" max="30" value="15" id="fib-range" oninput="buildFib(this.value)">
+    <span class="range-val" id="fib-val">15</span>
+  </div>
+  <main><div class="fib-row" id="fib-row"></div></main>
+</div>
+
+<script>
+const sections = ['mul','kuku','prime','fib'];
+
+function show(id) {
+  sections.forEach(s => {
+    document.getElementById('section-'+s).style.display = s===id ? '' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach((btn,i) => {
+    btn.classList.toggle('active', sections[i]===id);
+  });
+}
+
+// --- 掛け算表 ---
+function hsl(n, max) {
+  const h = (n/max) * 260;
+  return `hsl(${h},70%,${20 + (n/max)*18}%)`;
+}
+
+function buildMul(n) {
+  n = +n;
+  document.getElementById('mul-val').textContent = n;
+  const max = n*n;
+  let html = '<table>';
+  html += '<tr><th class="hdr" style="background:#0f172a"></th>';
+  for(let j=1;j<=n;j++) html += `<th class="hdr">${j}</th>`;
+  html += '</tr>';
+  for(let i=1;i<=n;i++){
+    html += `<tr><th class="hdr">${i}</th>`;
+    for(let j=1;j<=n;j++){
+      const v=i*j;
+      const bg = hsl(v,max);
+      html += `<td class="mul-cell" style="background:${bg};color:#e2e8f0" title="${i}×${j}=${v}">${v}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</table>';
+  document.getElementById('mul-table').innerHTML = html;
+}
+
+// --- 九九 ---
+function buildKuku() {
+  const colors = ['#7c3aed','#2563eb','#0891b2','#059669','#d97706','#dc2626','#db2777','#9333ea','#4f46e5'];
+  let html = '';
+  for(let i=1;i<=9;i++){
+    html += `<div class="kuku-card">
+      <div class="kuku-title" style="color:${colors[i-1]}">${i}の段</div>`;
+    for(let j=1;j<=9;j++){
+      html += `<div class="kuku-row"><span>${i}×${j}</span><span class="ans">${i*j}</span></div>`;
+    }
+    html += '</div>';
+  }
+  document.getElementById('kuku-grid').innerHTML = html;
+}
+
+// --- 素数表 ---
+function sieve(n) {
+  const a = new Uint8Array(n+1).fill(1);
+  a[0]=a[1]=0;
+  for(let i=2;i*i<=n;i++) if(a[i]) for(let j=i*i;j<=n;j+=i) a[j]=0;
+  return a;
+}
+
+function buildPrime(n) {
+  n = +n;
+  document.getElementById('prime-val').textContent = n;
+  const isPrime = sieve(n);
+  let html = '';
+  for(let i=1;i<=n;i++){
+    let cls = i===1 ? 'is-1' : isPrime[i] ? 'is-prime' : 'is-comp';
+    html += `<div class="num-chip ${cls}">${i}</div>`;
+  }
+  document.getElementById('prime-grid').innerHTML = html;
+}
+
+// --- フィボナッチ ---
+function buildFib(n) {
+  n = +n;
+  document.getElementById('fib-val').textContent = n;
+  let a=0,b=1,html='';
+  for(let i=1;i<=n;i++){
+    const alpha = 0.3 + 0.7*(i/n);
+    html += `<div class="fib-chip" style="opacity:${alpha}">
+      <span class="fib-idx">F(${i})</span>
+      <span class="fib-val">${a}</span>
+    </div>`;
+    [a,b]=[b,a+b];
+  }
+  document.getElementById('fib-row').innerHTML = html;
+}
+
+// 初期描画
+buildMul(12);
+buildKuku();
+buildPrime(100);
+buildFib(15);
+</script>
+</body>
+</html>
