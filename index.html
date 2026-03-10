@@ -325,11 +325,19 @@ let parseMethod = '';
 //  HTML TABLE PARSER  (Excel / Google Sheets → 最高精度)
 // ============================================================
 function parseHtmlTable(html) {
-  const div = document.createElement('div');
-  div.innerHTML = html;
+  // DOMParser を使って完全なHTMLドキュメントとして解析
+  // (div.innerHTML では <html><body> タグや大きなHTMLで問題が起きる)
+  let doc;
+  try {
+    doc = new DOMParser().parseFromString(html, 'text/html');
+  } catch(_) {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    doc = div;
+  }
 
-  // テーブルを全て取得し、セル数が最大のものを使う
-  const tables = Array.from(div.querySelectorAll('table'));
+  // セル数が最大のテーブルを選択
+  const tables = Array.from(doc.querySelectorAll('table'));
   if (!tables.length) return null;
   const tbl = tables.reduce((a, b) =>
     a.querySelectorAll('td,th').length >= b.querySelectorAll('td,th').length ? a : b
@@ -339,15 +347,13 @@ function parseHtmlTable(html) {
   tbl.querySelectorAll('tr').forEach(tr => {
     const cells = [];
     tr.querySelectorAll('td,th').forEach(td => {
-      // innerHTML → テキスト。改行・複数スペースを1スペースに
-      let t = td.innerText || td.textContent || '';
-      t = t.replace(/\s+/g, ' ').trim();
+      // textContent を使う（innerText は未接続DOMでは動かない）
+      let t = (td.textContent || '').replace(/\s+/g, ' ').trim();
       cells.push(t);
     });
     if (cells.some(c => c !== '')) rows.push(cells);
   });
 
-  // 全セルが空 or 1行のみなら不採用
   if (rows.length < 1) return null;
   return rows;
 }
@@ -648,71 +654,73 @@ function updateHint(numRows,numCols,method){
 //  PASTE HANDLERS
 // ============================================================
 
-// テキストエリアのペースト
-async function onRawPaste(e){
-  const items=Array.from(e.clipboardData.items);
+// クリップボードから最善のデータを取得して適用する共通ロジック
+async function processPaste(clipboardData) {
+  const items = Array.from(clipboardData.items);
 
   // 1) 画像
-  const img=items.find(it=>it.type.startsWith('image/'));
-  if(img){ e.preventDefault(); await ocrImage(img.getAsFile()); return; }
+  const img = items.find(it => it.type.startsWith('image/'));
+  if (img) { await ocrImage(img.getAsFile()); return; }
 
-  // 2) HTMLテーブル (Excel / Google Sheets が最高精度)
-  const html=e.clipboardData.getData('text/html');
-  if(html&&html.includes('<table')){
-    const rows=parseHtmlTable(html);
-    if(rows&&rows.length>=2&&rows[0].length>=2){
-      e.preventDefault();
-      // TSVにしてテキストエリアにも表示（ユーザーが確認できるように）
-      document.getElementById('raw-input').value=rows.map(r=>r.join('\t')).join('\n');
-      applyData(rows,'HTMLテーブル');
-      showToast('表データを取り込みました ✓');
-      return;
-    }
+  const html  = clipboardData.getData('text/html');
+  const plain = clipboardData.getData('text/plain');
+
+  // 2) HTMLテーブルとプレーンテキストを両方パースし、行数が多い方を採用
+  let htmlRows  = null;
+  let plainRows = null;
+
+  if (html && html.includes('<table')) {
+    htmlRows = parseHtmlTable(html);
+    // 列が1以下しかないなら不採用
+    if (htmlRows && htmlRows[0] && htmlRows[0].length < 2) htmlRows = null;
   }
 
-  // 3) プレーンテキスト
-  setTimeout(()=>{
-    const val=document.getElementById('raw-input').value;
-    if(!val.trim()) return;
-    const result=parseText(val);
-    if(result){ parsedData=result; updateHint(result.rows.length,result.headers.length,parseMethod); render(); }
-  },80);
+  if (plain && plain.trim()) {
+    const r = parseText(plain);
+    if (r) plainRows = [r.headers, ...r.rows];
+  }
+
+  // 行数が多い方を選ぶ（HTMLが途中で切れていてもプレーンテキストで補完）
+  let chosen = null;
+  let method = '';
+  if (htmlRows && plainRows) {
+    if (htmlRows.length >= plainRows.length) { chosen = htmlRows; method = 'HTMLテーブル'; }
+    else                                     { chosen = plainRows; method = parseMethod; }
+  } else if (htmlRows)  { chosen = htmlRows;  method = 'HTMLテーブル'; }
+  else if (plainRows)   { chosen = plainRows; method = parseMethod; }
+
+  if (!chosen || chosen.length < 1) {
+    // 最終フォールバック：プレーンテキストをそのまま
+    if (plain) {
+      document.getElementById('raw-input').value = plain;
+      onTextChange();
+    }
+    return;
+  }
+
+  // テキストエリアにTSVとして反映（ユーザーが内容を確認できる）
+  document.getElementById('raw-input').value = chosen.map(r => r.join('\t')).join('\n');
+  applyData(chosen, method);
+  showToast(`${chosen.length - 1} 行 × ${chosen[0].length} 列 を取り込みました ✓`);
+}
+
+// テキストエリアのペースト
+async function onRawPaste(e) {
+  e.preventDefault();
+  await processPaste(e.clipboardData);
 }
 
 // ページ全体のペースト（テキストエリア以外にフォーカスがある時）
-document.addEventListener('paste',async e=>{
-  const ta=document.getElementById('raw-input');
-  const items=Array.from(e.clipboardData.items);
-
+document.addEventListener('paste', async e => {
+  const ta = document.getElementById('raw-input');
   // 画像は常にキャプチャ
-  const img=items.find(it=>it.type.startsWith('image/'));
-  if(img){ e.preventDefault(); await ocrImage(img.getAsFile()); return; }
-
+  const img = Array.from(e.clipboardData.items).find(it => it.type.startsWith('image/'));
+  if (img) { e.preventDefault(); await ocrImage(img.getAsFile()); return; }
   // テキストエリア/input にフォーカスがある場合は onRawPaste に任せる
-  if(e.target===ta||e.target.tagName==='INPUT') return;
-
-  // HTMLテーブル
-  const html=e.clipboardData.getData('text/html');
-  if(html&&html.includes('<table')){
-    const rows=parseHtmlTable(html);
-    if(rows&&rows.length>=2&&rows[0].length>=2){
-      e.preventDefault();
-      ta.value=rows.map(r=>r.join('\t')).join('\n');
-      applyData(rows,'HTMLテーブル');
-      showToast('表データを取り込みました ✓');
-      return;
-    }
-  }
-
-  // プレーンテキスト
-  const txt=e.clipboardData.getData('text/plain');
-  if(!txt) return;
+  if (e.target === ta || e.target.tagName === 'INPUT') return;
   e.preventDefault();
-  ta.value=txt;
   ta.focus();
-  const result=parseText(txt);
-  if(result){ parsedData=result; updateHint(result.rows.length,result.headers.length,parseMethod); render(); }
-  showToast('データを貼り付けました ✓');
+  await processPaste(e.clipboardData);
 });
 
 // テキストエリアへの手入力
