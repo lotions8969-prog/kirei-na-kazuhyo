@@ -8,519 +8,155 @@
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root {
-  --bg: #f4f6f9;
-  --surface: #ffffff;
-  --border: #e2e8f0;
-  --text: #1e293b;
-  --muted: #64748b;
-  --accent: #3b82f6;
-  --accent2: #7c3aed;
-  --header-bg: #1e293b;
-  --header-text: #ffffff;
-  --row-even: #f8fafc;
-  --row-odd: #ffffff;
-  --row-hover: #eff6ff;
-  --num-pos: #1d4ed8;
-  --num-neg: #dc2626;
-  --heat-low: #eff6ff;
-  --heat-high: #1e40af;
-  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+  --bg:#f4f6f9; --surface:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b;
+  --accent:#3b82f6; --accent2:#7c3aed; --row-even:#f8fafc; --row-odd:#fff;
+  --row-hover:#eff6ff; --num-pos:#1d4ed8; --num-neg:#dc2626;
+  --shadow:0 4px 24px rgba(0,0,0,.08);
 }
+[data-theme=dark] {
+  --bg:#0f172a; --surface:#1e293b; --border:#334155; --text:#e2e8f0; --muted:#94a3b8;
+  --accent:#60a5fa; --accent2:#a78bfa; --row-even:#1a2740; --row-odd:#1e293b;
+  --row-hover:#1e3a5f; --num-pos:#60a5fa; --num-neg:#f87171;
+  --shadow:0 4px 24px rgba(0,0,0,.4);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Noto Sans JP','Segoe UI',sans-serif;min-height:100vh;transition:background .3s,color .3s}
 
-[data-theme="dark"] {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --border: #334155;
-  --text: #e2e8f0;
-  --muted: #94a3b8;
-  --accent: #60a5fa;
-  --accent2: #a78bfa;
-  --header-bg: #0f172a;
-  --header-text: #f1f5f9;
-  --row-even: #1a2740;
-  --row-odd: #1e293b;
-  --row-hover: #1e3a5f;
-  --num-pos: #60a5fa;
-  --num-neg: #f87171;
-  --heat-low: #1e293b;
-  --heat-high: #3b82f6;
-  --shadow: 0 4px 24px rgba(0,0,0,0.4);
-}
+/* HEADER */
+.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:54px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow);position:sticky;top:0;z-index:100}
+.app-title{font-size:1.05rem;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header-actions{display:flex;gap:6px;align-items:center}
 
-* { margin:0; padding:0; box-sizing:border-box; }
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;font-size:.8rem;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text);transition:all .2s;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{opacity:.9;color:#fff}
+.btn-ghost{border-color:transparent}
+.btn-ghost:hover{background:var(--row-hover);border-color:var(--border);color:var(--text)}
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
-  min-height: 100vh;
-  transition: background 0.3s, color 0.3s;
-}
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:320px 1fr;min-height:calc(100vh - 54px)}
 
-/* ===== HEADER ===== */
-.app-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 0 24px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: var(--shadow);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
+/* SIDEBAR */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;max-height:calc(100vh - 54px);position:sticky;top:54px}
+.sec-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
 
-.app-title {
-  font-size: 1.1rem;
-  font-weight: 800;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+/* INPUT AREA */
+.input-area{border:2px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .2s,box-shadow .2s;background:var(--surface)}
+.input-area:focus-within,.input-area.drag-over{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.15)}
+.input-area-top{padding:8px 12px 6px;background:var(--row-even);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.input-label{font-size:.78rem;font-weight:700;color:var(--accent)}
+.data-textarea{width:100%;min-height:160px;padding:10px 12px;border:none;outline:none;background:var(--surface);color:var(--text);font-size:.8rem;font-family:'Menlo','Consolas',monospace;resize:vertical;display:block;line-height:1.5}
+.input-footer{padding:5px 10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--row-even)}
+.parse-hint{font-size:.72rem;color:var(--muted);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.parse-badge{font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--accent);color:#fff;flex-shrink:0;margin-right:6px;display:none}
 
-.header-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
+/* SETTINGS */
+.settings-grid{display:flex;flex-direction:column;gap:10px}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.setting-label{font-size:.82rem;color:var(--text);flex:1}
+.setting-label small{display:block;font-size:.7rem;color:var(--muted)}
+select,input[type=text]{padding:5px 9px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:.8rem;outline:none;transition:border-color .2s;cursor:pointer}
+select:focus,input[type=text]:focus{border-color:var(--accent)}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:999px;transition:.3s}
+.toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.toggle input:checked+.toggle-slider{background:var(--accent)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(16px)}
 
-/* ===== BUTTONS ===== */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.btn:hover { border-color: var(--accent); color: var(--accent); }
-.btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-.btn-primary:hover { opacity: 0.9; color: #fff; }
-.btn-ghost { border-color: transparent; }
-.btn-ghost:hover { background: var(--row-hover); border-color: var(--border); color: var(--text); }
+/* SCHEME */
+.scheme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.scheme-chip{border-radius:7px;height:36px;cursor:pointer;border:2.5px solid transparent;transition:all .2s;overflow:hidden;display:flex}
+.scheme-chip.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(59,130,246,.3)}
+.scheme-chip div{flex:1}
 
-/* ===== LAYOUT ===== */
-.layout {
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  gap: 0;
-  min-height: calc(100vh - 56px);
-}
+/* MAIN */
+.main{padding:20px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.toolbar-sep{width:1px;height:22px;background:var(--border);margin:0 2px}
+.title-input{font-size:1.05rem;font-weight:700;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--text);outline:none;padding:2px 4px;transition:border-color .2s;min-width:180px}
+.title-input:focus{border-color:var(--accent)}
+.title-input::placeholder{color:var(--muted);font-weight:400}
 
-/* ===== SIDEBAR ===== */
-.sidebar {
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  overflow-y: auto;
-  max-height: calc(100vh - 56px);
-  position: sticky;
-  top: 56px;
-}
+/* TABLE CONTAINER */
+#table-container{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--border)}
+.table-title-bar{padding:14px 20px 10px;border-bottom:1px solid var(--border)}
+.table-title{font-size:1rem;font-weight:700;color:var(--text)}
+.table-subtitle{font-size:.76rem;color:var(--muted);margin-top:2px}
+.table-scroll{overflow-x:auto}
 
-.section-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
+table{width:100%;border-collapse:collapse}
 
-/* ===== INPUT AREA ===== */
-.input-area {
-  border: 2px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  background: var(--surface);
-}
-.input-area:focus-within,
-.input-area.drag-over {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
-}
-.input-area-header {
-  padding: 8px 12px;
-  background: var(--row-even);
-  border-bottom: 1px solid var(--border);
-}
-.input-area-hint {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--accent);
-}
-.data-input {
-  width: 100%;
-  min-height: 180px;
-  padding: 12px;
-  border: none;
-  outline: none;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.82rem;
-  font-family: 'Menlo', 'Consolas', monospace;
-  resize: vertical;
-  display: block;
-}
-.textarea-footer {
-  padding: 6px 12px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--row-even);
-}
-.input-hint { font-size: 0.72rem; color: var(--muted); }
+/* THEMES */
+.theme-blue thead tr{background:#1e3a5f}
+.theme-blue thead th{color:#bfdbfe}
+.theme-blue tbody tr:hover{background:#eff6ff!important}
+[data-theme=dark] .theme-blue tbody tr:hover{background:#1e3a5f!important}
+.theme-slate thead tr{background:#334155}
+.theme-slate thead th{color:#e2e8f0}
+.theme-slate tbody tr:hover{background:#f1f5f9!important}
+[data-theme=dark] .theme-slate tbody tr:hover{background:#334155!important}
+.theme-purple thead tr{background:#4c1d95}
+.theme-purple thead th{color:#ddd6fe}
+.theme-purple tbody tr:hover{background:#f5f3ff!important}
+[data-theme=dark] .theme-purple tbody tr:hover{background:#2e1065!important}
+.theme-green thead tr{background:#14532d}
+.theme-green thead th{color:#bbf7d0}
+.theme-green tbody tr:hover{background:#f0fdf4!important}
+[data-theme=dark] .theme-green tbody tr:hover{background:#14532d!important}
+.theme-warm thead tr{background:#7c2d12}
+.theme-warm thead th{color:#fed7aa}
+.theme-warm tbody tr:hover{background:#fff7ed!important}
+[data-theme=dark] .theme-warm tbody tr:hover{background:#7c2d12!important}
+.theme-mono thead tr{background:#111827}
+.theme-mono thead th{color:#f9fafb}
+.theme-mono tbody tr:hover{background:#f9fafb!important}
+[data-theme=dark] .theme-mono tbody tr:hover{background:#374151!important}
 
-/* ===== SETTINGS ===== */
-.settings-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+thead th{padding:11px 14px;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-align:left;white-space:nowrap;user-select:none;cursor:pointer}
+thead th.num{text-align:right}
+thead th .si{opacity:.4;margin-left:3px;font-size:.75em}
+thead th.sorted .si{opacity:1}
+tbody td{padding:9px 14px;font-size:.85rem;border-bottom:1px solid var(--border);vertical-align:middle;transition:background .1s}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:nth-child(even){background:var(--row-even)}
+tbody tr:nth-child(odd){background:var(--row-odd)}
+td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:'Menlo','Consolas',monospace;color:var(--num-pos)}
+td.num.neg{color:var(--num-neg)}
+td.num.zero{color:var(--muted)}
+td.row-idx{color:var(--muted);font-size:.73rem;font-variant-numeric:tabular-nums;text-align:right;padding-right:6px;width:36px;background:var(--row-even)!important;border-right:1px solid var(--border)}
+td.heat{position:relative}
+td.heat .bar{position:absolute;left:0;top:0;bottom:0;background:rgba(59,130,246,.1);z-index:0;transition:width .3s}
+td.heat .cv{position:relative;z-index:1}
+.total-row{font-weight:700;background:var(--row-even)!important;border-top:2px solid var(--border)!important}
+.table-footer{padding:9px 20px;border-top:1px solid var(--border);background:var(--row-even);display:flex;gap:20px;font-size:.76rem;color:var(--muted);flex-wrap:wrap;align-items:center}
+.table-footer strong{color:var(--text)}
 
-.setting-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.setting-label { font-size: 0.83rem; color: var(--text); flex: 1; }
-.setting-label small { display: block; font-size: 0.72rem; color: var(--muted); }
+/* EMPTY */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:70px 20px;color:var(--muted);text-align:center;gap:10px}
+.empty-icon{font-size:3rem;opacity:.25}
+.empty-title{font-size:.95rem;font-weight:600}
+.empty-hint{font-size:.81rem;line-height:1.7;max-width:300px}
 
-select, input[type=text] {
-  padding: 6px 10px;
-  border-radius: 7px;
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.82rem;
-  outline: none;
-  transition: border-color 0.2s;
-  cursor: pointer;
-}
-select:focus, input[type=text]:focus { border-color: var(--accent); }
+/* TOAST */
+.toast{position:fixed;bottom:22px;right:22px;background:#1e293b;color:#f1f5f9;padding:10px 18px;border-radius:9px;font-size:.83rem;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.3);transform:translateY(70px);opacity:0;transition:all .3s;z-index:999}
+.toast.show{transform:translateY(0);opacity:1}
 
-/* toggle */
-.toggle {
-  position: relative;
-  width: 38px;
-  height: 22px;
-  flex-shrink: 0;
-}
-.toggle input { opacity: 0; width: 0; height: 0; }
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  background: var(--border);
-  border-radius: 999px;
-  transition: 0.3s;
-}
-.toggle-slider::before {
-  content: '';
-  position: absolute;
-  width: 16px; height: 16px;
-  left: 3px; bottom: 3px;
-  background: #fff;
-  border-radius: 50%;
-  transition: 0.3s;
-}
-.toggle input:checked + .toggle-slider { background: var(--accent); }
-.toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+/* OCR OVERLAY */
+.ocr-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,26,.75);z-index:200;align-items:center;justify-content:center;flex-direction:column;gap:14px;backdrop-filter:blur(4px)}
+.ocr-overlay.show{display:flex}
+.ocr-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px 36px;text-align:center;min-width:260px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.ocr-spinner{width:38px;height:38px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ocr-title{font-weight:700;color:var(--text);margin-bottom:5px}
+.ocr-prog{font-size:.8rem;color:var(--muted)}
+.ocr-bar-w{height:4px;background:var(--border);border-radius:9px;margin-top:10px;overflow:hidden}
+.ocr-bar{height:100%;background:var(--accent);border-radius:9px;transition:width .3s;width:0%}
 
-/* color scheme chips */
-.scheme-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-.scheme-chip {
-  border-radius: 8px;
-  height: 40px;
-  cursor: pointer;
-  border: 2.5px solid transparent;
-  transition: all 0.2s;
-  overflow: hidden;
-  display: flex;
-}
-.scheme-chip.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,0.3); }
-.scheme-chip div { flex: 1; }
-
-/* ===== MAIN ===== */
-.main {
-  padding: 24px;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* ===== TOOLBAR ===== */
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.toolbar-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
-.title-input {
-  font-size: 1.1rem;
-  font-weight: 700;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--text);
-  outline: none;
-  padding: 2px 4px;
-  transition: border-color 0.2s;
-  min-width: 200px;
-}
-.title-input:focus { border-color: var(--accent); }
-.title-input::placeholder { color: var(--muted); font-weight: 400; }
-
-/* ===== TABLE CONTAINER ===== */
-#table-container {
-  background: var(--surface);
-  border-radius: 16px;
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-
-.table-title-bar {
-  padding: 16px 24px 12px;
-  border-bottom: 1px solid var(--border);
-}
-.table-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text);
-}
-.table-subtitle {
-  font-size: 0.78rem;
-  color: var(--muted);
-  margin-top: 3px;
-}
-
-.table-scroll { overflow-x: auto; }
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-/* THEME: default blue */
-.theme-blue thead tr { background: #1e3a5f; }
-.theme-blue thead th { color: #bfdbfe; }
-.theme-blue tbody tr:hover { background: #eff6ff !important; }
-[data-theme="dark"] .theme-blue tbody tr:hover { background: #1e3a5f !important; }
-
-/* THEME: slate */
-.theme-slate thead tr { background: #334155; }
-.theme-slate thead th { color: #e2e8f0; }
-.theme-slate tbody tr:hover { background: #f1f5f9 !important; }
-[data-theme="dark"] .theme-slate tbody tr:hover { background: #334155 !important; }
-
-/* THEME: purple */
-.theme-purple thead tr { background: #4c1d95; }
-.theme-purple thead th { color: #ddd6fe; }
-.theme-purple tbody tr:hover { background: #f5f3ff !important; }
-[data-theme="dark"] .theme-purple tbody tr:hover { background: #2e1065 !important; }
-
-/* THEME: green */
-.theme-green thead tr { background: #14532d; }
-.theme-green thead th { color: #bbf7d0; }
-.theme-green tbody tr:hover { background: #f0fdf4 !important; }
-[data-theme="dark"] .theme-green tbody tr:hover { background: #14532d !important; }
-
-/* THEME: warm */
-.theme-warm thead tr { background: #7c2d12; }
-.theme-warm thead th { color: #fed7aa; }
-.theme-warm tbody tr:hover { background: #fff7ed !important; }
-[data-theme="dark"] .theme-warm tbody tr:hover { background: #7c2d12 !important; }
-
-/* THEME: mono */
-.theme-mono thead tr { background: #111827; }
-.theme-mono thead th { color: #f9fafb; }
-.theme-mono tbody tr:hover { background: #f9fafb !important; }
-[data-theme="dark"] .theme-mono tbody tr:hover { background: #374151 !important; }
-
-thead th {
-  padding: 12px 16px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-align: left;
-  white-space: nowrap;
-  user-select: none;
-  cursor: pointer;
-}
-thead th.num { text-align: right; }
-thead th .sort-icon { opacity: 0.4; margin-left: 4px; }
-thead th.sorted .sort-icon { opacity: 1; }
-
-tbody td {
-  padding: 10px 16px;
-  font-size: 0.87rem;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-  transition: background 0.1s;
-}
-
-tbody tr:last-child td { border-bottom: none; }
-tbody tr:nth-child(even) { background: var(--row-even); }
-tbody tr:nth-child(odd) { background: var(--row-odd); }
-
-td.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-family: 'Menlo','Consolas', monospace;
-  color: var(--num-pos);
-}
-td.num.negative { color: var(--num-neg); }
-td.num.zero { color: var(--muted); }
-
-/* heat map overlay */
-td.heat span.bar {
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  background: rgba(59,130,246,0.12);
-  z-index: 0;
-  transition: width 0.3s;
-}
-td.heat {
-  position: relative;
-}
-td.heat .cell-val { position: relative; z-index: 1; }
-
-/* stripe for index */
-td.row-idx {
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  padding-right: 8px;
-  width: 40px;
-  background: var(--row-even) !important;
-  border-right: 1px solid var(--border);
-}
-
-/* footer summary */
-.table-footer {
-  padding: 10px 24px;
-  border-top: 2px solid var(--border);
-  background: var(--row-even);
-  display: flex;
-  gap: 24px;
-  font-size: 0.78rem;
-  color: var(--muted);
-  flex-wrap: wrap;
-}
-.summary-item strong { color: var(--text); }
-
-/* ===== EMPTY STATE ===== */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  color: var(--muted);
-  text-align: center;
-  gap: 12px;
-}
-.empty-icon { font-size: 3.5rem; opacity: 0.3; }
-.empty-title { font-size: 1rem; font-weight: 600; }
-.empty-hint { font-size: 0.83rem; line-height: 1.7; max-width: 320px; }
-
-/* ===== TOAST ===== */
-.toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: #1e293b;
-  color: #f1f5f9;
-  padding: 12px 20px;
-  border-radius: 10px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-  transform: translateY(80px);
-  opacity: 0;
-  transition: all 0.3s;
-  z-index: 999;
-}
-.toast.show { transform: translateY(0); opacity: 1; }
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-  .layout { grid-template-columns: 1fr; }
-  .sidebar { max-height: none; position: static; }
-  .main { padding: 16px; }
-}
-
-/* ===== OCR OVERLAY ===== */
-.ocr-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(10,10,26,0.75);
-  z-index: 200;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 16px;
-  backdrop-filter: blur(4px);
-}
-.ocr-overlay.show { display: flex; }
-.ocr-box {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 32px 40px;
-  text-align: center;
-  min-width: 280px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-.ocr-spinner {
-  width: 40px; height: 40px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto 12px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.ocr-title { font-weight: 700; color: var(--text); margin-bottom: 6px; }
-.ocr-progress { font-size: 0.82rem; color: var(--muted); }
-.ocr-bar-wrap { height: 4px; background: var(--border); border-radius: 9px; margin-top: 12px; overflow: hidden; }
-.ocr-bar { height: 100%; background: var(--accent); border-radius: 9px; transition: width 0.3s; width: 0%; }
-
-/* ===== PRINT ===== */
-@media print {
-  .app-header, .sidebar, .toolbar { display: none !important; }
-  .main { padding: 0; }
-  #table-container { box-shadow: none; border-radius: 0; }
-}
+@media print{.app-header,.sidebar,.toolbar{display:none!important}.main{padding:0}#table-container{box-shadow:none;border-radius:0}}
+@media(max-width:768px){.layout{grid-template-columns:1fr}.sidebar{max-height:none;position:static}}
 </style>
 </head>
 <body>
@@ -536,97 +172,63 @@ td.row-idx {
 </header>
 
 <div class="layout">
-  <!-- SIDEBAR -->
   <div class="sidebar">
 
+    <!-- INPUT -->
     <div>
-      <div class="section-label">データ入力</div>
-
+      <div class="sec-label">データ入力</div>
       <div class="input-area" id="input-area">
-        <div class="input-area-header">
-          <span class="input-area-hint" id="input-area-hint">📋 ここにデータを貼り付け（Cmd+V / Ctrl+V）</span>
+        <div class="input-area-top">
+          <span class="input-label">📋 ここにデータを貼り付け</span>
+          <span style="font-size:.7rem;color:var(--muted)">Cmd+V / Ctrl+V</span>
         </div>
-        <textarea class="data-input" id="raw-input"
-          placeholder="Excelやスプレッドシートからコピーして&#10;ここに貼り付けてください&#10;&#10;テキスト・CSV・TSV・スペース区切り・&#10;スクリーンショット画像 すべて対応"
-          oninput="onInputChange()"
+        <textarea class="data-textarea" id="raw-input"
+          placeholder="Excel・スプレッドシート・CSV・TSV・&#10;スペース区切りテキスト・スクリーンショット&#10;&#10;どこに貼り付けても自動的にここに入ります"
+          oninput="onTextChange()"
           onpaste="onRawPaste(event)"></textarea>
-        <div class="textarea-footer">
-          <span class="input-hint" id="parse-hint">データを貼り付けてください</span>
-          <button class="btn btn-ghost" style="padding:3px 8px;font-size:0.72rem" onclick="clearData()">クリア</button>
+        <div class="input-footer">
+          <span class="parse-badge" id="parse-badge"></span>
+          <span class="parse-hint" id="parse-hint">データを貼り付けてください</span>
+          <button class="btn btn-ghost" style="padding:2px 8px;font-size:.7rem;flex-shrink:0" onclick="clearAll()">クリア</button>
         </div>
       </div>
     </div>
 
     <!-- SETTINGS -->
     <div>
-      <div class="section-label">表のスタイル</div>
+      <div class="sec-label">表のスタイル</div>
       <div class="settings-grid">
 
         <div>
-          <div class="section-label" style="margin-bottom:6px">カラーテーマ</div>
+          <div class="sec-label" style="margin-bottom:5px">カラーテーマ</div>
           <div class="scheme-grid" id="scheme-grid">
-            <div class="scheme-chip active" data-scheme="blue" onclick="setScheme('blue')" title="ブルー">
+            <div class="scheme-chip active" data-s="blue" onclick="setScheme('blue')" title="ブルー">
               <div style="background:#1e3a5f"></div><div style="background:#eff6ff"></div><div style="background:#bfdbfe"></div>
             </div>
-            <div class="scheme-chip" data-scheme="slate" onclick="setScheme('slate')" title="スレート">
+            <div class="scheme-chip" data-s="slate" onclick="setScheme('slate')" title="スレート">
               <div style="background:#334155"></div><div style="background:#f1f5f9"></div><div style="background:#94a3b8"></div>
             </div>
-            <div class="scheme-chip" data-scheme="purple" onclick="setScheme('purple')" title="パープル">
+            <div class="scheme-chip" data-s="purple" onclick="setScheme('purple')" title="パープル">
               <div style="background:#4c1d95"></div><div style="background:#f5f3ff"></div><div style="background:#ddd6fe"></div>
             </div>
-            <div class="scheme-chip" data-scheme="green" onclick="setScheme('green')" title="グリーン">
+            <div class="scheme-chip" data-s="green" onclick="setScheme('green')" title="グリーン">
               <div style="background:#14532d"></div><div style="background:#f0fdf4"></div><div style="background:#bbf7d0"></div>
             </div>
-            <div class="scheme-chip" data-scheme="warm" onclick="setScheme('warm')" title="ウォーム">
+            <div class="scheme-chip" data-s="warm" onclick="setScheme('warm')" title="ウォーム">
               <div style="background:#7c2d12"></div><div style="background:#fff7ed"></div><div style="background:#fed7aa"></div>
             </div>
-            <div class="scheme-chip" data-scheme="mono" onclick="setScheme('mono')" title="モノクロ">
+            <div class="scheme-chip" data-s="mono" onclick="setScheme('mono')" title="モノクロ">
               <div style="background:#111827"></div><div style="background:#f9fafb"></div><div style="background:#6b7280"></div>
             </div>
           </div>
         </div>
 
         <div class="setting-row">
-          <label class="setting-label">行番号を表示</label>
-          <label class="toggle">
-            <input type="checkbox" id="tog-rownum" onchange="render()">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-row">
           <label class="setting-label">
-            数値カラーバー
-            <small>数値列に棒グラフ背景を表示</small>
+            区切り文字（手動）
+            <small>自動がうまくいかない時</small>
           </label>
-          <label class="toggle">
-            <input type="checkbox" id="tog-heat" onchange="render()">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-row">
-          <label class="setting-label">合計行を追加</label>
-          <label class="toggle">
-            <input type="checkbox" id="tog-total" onchange="render()">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-row">
-          <label class="setting-label">サマリーを表示</label>
-          <label class="toggle">
-            <input type="checkbox" id="tog-summary" checked onchange="render()">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-row">
-          <label class="setting-label">
-            区切り文字
-            <small>自動検出がうまくいかない時に変更</small>
-          </label>
-          <select id="delim-select" onchange="onInputChange()">
+          <select id="delim-sel" onchange="onTextChange()">
             <option value="auto">自動</option>
             <option value="tab">タブ</option>
             <option value="comma">カンマ</option>
@@ -637,30 +239,42 @@ td.row-idx {
         </div>
 
         <div class="setting-row">
-          <label class="setting-label">
-            数値フォーマット
-            <small>数値の桁区切り・小数点</small>
-          </label>
-          <select id="num-format" onchange="render()">
+          <label class="setting-label">行番号を表示</label>
+          <label class="toggle"><input type="checkbox" id="tog-rownum" onchange="render()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">数値カラーバー<small>棒グラフ背景</small></label>
+          <label class="toggle"><input type="checkbox" id="tog-heat" onchange="render()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">合計行を追加</label>
+          <label class="toggle"><input type="checkbox" id="tog-total" onchange="render()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">サマリーを表示</label>
+          <label class="toggle"><input type="checkbox" id="tog-summary" checked onchange="render()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">数値フォーマット</label>
+          <select id="num-fmt" onchange="render()">
             <option value="auto">自動</option>
             <option value="comma">カンマ区切り</option>
             <option value="pct">%表示</option>
             <option value="raw">そのまま</option>
           </select>
         </div>
-
         <div class="setting-row">
           <label class="setting-label">サブタイトル</label>
-          <input type="text" id="subtitle-input" placeholder="（任意）" style="width:160px" oninput="render()">
+          <input type="text" id="subtitle-inp" placeholder="（任意）" style="width:140px" oninput="render()">
         </div>
 
       </div>
     </div>
 
-    <!-- サンプル -->
+    <!-- SAMPLES -->
     <div>
-      <div class="section-label">サンプルデータ</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
+      <div class="sec-label">サンプルデータ</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
         <button class="btn" style="justify-content:flex-start" onclick="loadSample('sales')">📈 売上表（月別）</button>
         <button class="btn" style="justify-content:flex-start" onclick="loadSample('kpi')">📊 KPI一覧</button>
         <button class="btn" style="justify-content:flex-start" onclick="loadSample('compare')">🔄 前年比較</button>
@@ -672,20 +286,15 @@ td.row-idx {
   <!-- MAIN -->
   <div class="main">
     <div class="toolbar">
-      <input class="title-input" id="title-input" placeholder="表のタイトルを入力..." oninput="render()" value="">
+      <input class="title-input" id="title-inp" placeholder="表のタイトルを入力..." oninput="render()" value="">
       <div class="toolbar-sep"></div>
       <button class="btn btn-ghost" id="sort-reset-btn" style="display:none" onclick="resetSort()">↺ ソート解除</button>
     </div>
-
     <div id="table-container">
-      <div class="empty-state" id="empty-state">
+      <div class="empty-state">
         <div class="empty-icon">📋</div>
         <div class="empty-title">データを貼り付けてください</div>
-        <div class="empty-hint">
-          ExcelやGoogleスプレッドシートからコピーしたデータ、<br>
-          CSVやTSV形式のテキストを左側に貼り付けると<br>
-          レポート用の綺麗な表に変換します。
-        </div>
+        <div class="empty-hint">Excel・スプレッドシート・CSV・テキストをコピーして<br>Cmd+V（Mac）/ Ctrl+V（Windows）で貼り付けると<br>綺麗なレポート表に変換します</div>
       </div>
     </div>
   </div>
@@ -696,445 +305,599 @@ td.row-idx {
   <div class="ocr-box">
     <div class="ocr-spinner"></div>
     <div class="ocr-title">画像を解析中...</div>
-    <div class="ocr-progress" id="ocr-progress">テキストを認識しています</div>
-    <div class="ocr-bar-wrap"><div class="ocr-bar" id="ocr-bar"></div></div>
+    <div class="ocr-prog" id="ocr-prog">初期化中</div>
+    <div class="ocr-bar-w"><div class="ocr-bar" id="ocr-bar"></div></div>
   </div>
 </div>
 
 <script>
-// ===== STATE =====
-let parsedData = null;   // { headers: [], rows: [] }
-let currentScheme = 'blue';
-let sortCol = -1;
-let sortAsc = true;
-let colTypes = [];       // 'num' | 'text'
+// ============================================================
+//  STATE
+// ============================================================
+let parsedData  = null;   // { headers:[], rows:[] }
+let colTypes    = [];     // 'num'|'text'
+let scheme      = 'blue';
+let sortCol     = -1;
+let sortAsc     = true;
+let parseMethod = '';
 
-// ===== PARSE =====
+// ============================================================
+//  HTML TABLE PARSER  (Excel / Google Sheets → 最高精度)
+// ============================================================
+function parseHtmlTable(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html;
 
-// スコア: 列数が多く・ばらつきが少ないほど高得点
-function scoreRows(rows) {
-  if (!rows.length) return 0;
-  const counts = rows.map(r => r.length);
-  const sorted = [...counts].sort((a,b) => a-b);
-  const median = sorted[Math.floor(sorted.length / 2)];
-  if (median <= 1) return 0;
-  const consistent = counts.filter(c => Math.abs(c - median) <= 1).length / counts.length;
-  return median * consistent;
+  // テーブルを全て取得し、セル数が最大のものを使う
+  const tables = Array.from(div.querySelectorAll('table'));
+  if (!tables.length) return null;
+  const tbl = tables.reduce((a, b) =>
+    a.querySelectorAll('td,th').length >= b.querySelectorAll('td,th').length ? a : b
+  );
+
+  const rows = [];
+  tbl.querySelectorAll('tr').forEach(tr => {
+    const cells = [];
+    tr.querySelectorAll('td,th').forEach(td => {
+      // innerHTML → テキスト。改行・複数スペースを1スペースに
+      let t = td.innerText || td.textContent || '';
+      t = t.replace(/\s+/g, ' ').trim();
+      cells.push(t);
+    });
+    if (cells.some(c => c !== '')) rows.push(cells);
+  });
+
+  // 全セルが空 or 1行のみなら不採用
+  if (rows.length < 1) return null;
+  return rows;
 }
 
-// CSV（ダブルクォート対応）
+// ============================================================
+//  TEXT PARSER  (TSV / CSV / Markdown / Fixed-width / Space)
+// ============================================================
 function csvSplit(line) {
-  const result = []; let cur = ''; let inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') { inQ = !inQ; continue; }
-    if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
-    else cur += ch;
+  const r=[]; let cur=''; let inQ=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){inQ=!inQ;continue}
+    if(ch===','&&!inQ){r.push(cur.trim());cur=''}
+    else cur+=ch;
   }
-  result.push(cur.trim());
-  return result;
+  r.push(cur.trim());
+  return r;
 }
 
-// Markdownテーブル（| 区切り）
 function pipeSplit(line) {
-  const cells = line.split('|').map(c => c.trim());
-  if (cells[0] === '') cells.shift();
-  if (cells[cells.length - 1] === '') cells.pop();
-  return cells;
+  const c = line.split('|').map(s=>s.trim());
+  if(c[0]==='') c.shift();
+  if(c[c.length-1]==='') c.pop();
+  return c;
 }
 
-// 固定幅列検出（スペースが多くの行で揃っている位置を列境界とする）
+function scoreRows(rows) {
+  if(!rows.length) return 0;
+  const counts = rows.map(r=>r.length);
+  const med = [...counts].sort((a,b)=>a-b)[Math.floor(counts.length/2)];
+  if(med<=1) return 0;
+  const cons = counts.filter(c=>Math.abs(c-med)<=1).length/counts.length;
+  return med * cons;
+}
+
 function parseFixedWidth(lines) {
-  if (lines.length < 2) return null;
-  const maxLen = Math.max(...lines.map(l => l.length));
-  const spaceFreq = new Array(maxLen).fill(0);
-  for (const line of lines) {
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === ' ') spaceFreq[i]++;
-    }
-    for (let i = line.length; i < maxLen; i++) spaceFreq[i]++;
+  if(lines.length<2) return null;
+  const maxLen = Math.max(...lines.map(l=>l.length));
+  const spFreq = new Array(maxLen).fill(0);
+  for(const line of lines){
+    for(let i=0;i<line.length;i++) if(line[i]===' ') spFreq[i]++;
+    for(let i=line.length;i<maxLen;i++) spFreq[i]++;
   }
-  const threshold = lines.length * 0.65;
-  // スペースの"塊"が終わる位置（非スペースが来る直前）を列開始とする
-  const colStarts = [0];
-  let inSpace = spaceFreq[0] >= threshold;
-  for (let i = 1; i < maxLen; i++) {
-    const isSpace = spaceFreq[i] >= threshold;
-    if (!isSpace && inSpace) colStarts.push(i);
-    inSpace = isSpace;
+  const th = lines.length*0.65;
+  const colStarts=[0];
+  let inSp=spFreq[0]>=th;
+  for(let i=1;i<maxLen;i++){
+    const isSp=spFreq[i]>=th;
+    if(!isSp&&inSp) colStarts.push(i);
+    inSp=isSp;
   }
-  if (colStarts.length < 2) return null;
-  return lines.map(line =>
-    colStarts.map((start, idx) => {
-      const end = idx + 1 < colStarts.length ? colStarts[idx + 1] : line.length;
-      return line.slice(start, Math.min(end, line.length)).trim();
+  if(colStarts.length<2) return null;
+  return lines.map(line=>
+    colStarts.map((s,idx)=>{
+      const e=idx+1<colStarts.length?colStarts[idx+1]:line.length;
+      return line.slice(s,Math.min(e,line.length)).trim();
     })
   );
 }
 
-function parseData(raw) {
-  raw = raw.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  raw = raw.replace(/[\u200B-\u200D\uFEFF]/g, ''); // ゼロ幅文字除去
-  if (!raw) return null;
+function parseText(raw) {
+  raw = raw.trim()
+    .replace(/\r\n/g,'\n').replace(/\r/g,'\n')
+    .replace(/[\u200B-\u200D\uFEFF]/g,'')   // ゼロ幅文字
+    .replace(/　/g,' ');                      // 全角スペース
+  if(!raw) return null;
 
-  const lines = raw.split('\n').filter(l => l.trim());
-  if (!lines.length) return null;
+  const lines = raw.split('\n').filter(l=>l.trim());
+  if(!lines.length) return null;
 
-  const manualDelim = document.getElementById('delim-select')?.value ?? 'auto';
+  const manual = document.getElementById('delim-sel')?.value ?? 'auto';
+  let rows;
 
-  let chosenRows;
-
-  if (manualDelim !== 'auto') {
-    const fns = {
-      tab:   l => l.split('\t').map(c => c.trim()),
-      comma: l => csvSplit(l),
-      space: l => l.trim().split(/\s+/).filter(c => c),
-      pipe:  l => pipeSplit(l),
-      semi:  l => l.split(';').map(c => c.trim()),
+  if(manual!=='auto'){
+    const fns={
+      tab:   l=>l.split('\t').map(c=>c.trim()),
+      comma: l=>csvSplit(l),
+      space: l=>l.trim().split(/\s+/).filter(c=>c),
+      pipe:  l=>pipeSplit(l),
+      semi:  l=>l.split(';').map(c=>c.trim()),
     };
-    chosenRows = lines.map(fns[manualDelim] || (l => [l]));
+    rows = lines.map(fns[manual]||(l=>[l]));
+    parseMethod = manual;
   } else {
-    // ===== 自動検出: 全候補をスコアリングして最良を選ぶ =====
-    const candidates = [];
+    const cands=[];
 
-    // タブ
-    const tabRows = lines.map(l => l.split('\t').map(c => c.trim()));
-    candidates.push({ name:'tab', rows: tabRows });
+    // タブ (TSV)
+    const tRows=lines.map(l=>l.split('\t').map(c=>c.trim()));
+    cands.push({name:'TSV',rows:tRows,score:scoreRows(tRows)});
 
     // CSV
-    const csvRows = lines.map(csvSplit);
-    candidates.push({ name:'csv', rows: csvRows });
+    const cRows=lines.map(csvSplit);
+    cands.push({name:'CSV',rows:cRows,score:scoreRows(cRows)});
 
     // セミコロン
-    const semiRows = lines.map(l => l.split(';').map(c => c.trim()));
-    candidates.push({ name:'semi', rows: semiRows });
+    const sRows=lines.map(l=>l.split(';').map(c=>c.trim()));
+    cands.push({name:'セミコロン',rows:sRows,score:scoreRows(sRows)});
 
-    // パイプ（Markdownテーブル含む）
-    const hasPipe = lines.some(l => l.includes('|'));
-    if (hasPipe) {
-      // セパレータ行（|---| 等）を除外してからパース
-      const noSep = lines.filter(l => !/^\|?[\s|:-]+\|/.test(l));
-      candidates.push({ name:'pipe', rows: noSep.map(pipeSplit) });
+    // Markdownテーブル
+    const hasPipe=lines.filter(l=>l.includes('|')).length>lines.length*.5;
+    if(hasPipe){
+      const noSep=lines.filter(l=>!/^\|?[\s|:-]+\|/.test(l));
+      const pRows=noSep.map(pipeSplit);
+      cands.push({name:'Markdown',rows:pRows,score:scoreRows(pRows)});
     }
 
     // スペース2+
-    const sp2rows = lines.map(l => l.trim().split(/\s{2,}/).map(c => c.trim()).filter(c => c));
-    candidates.push({ name:'space2', rows: sp2rows });
+    const s2=lines.map(l=>l.trim().split(/\s{2,}/).map(c=>c.trim()).filter(c=>c));
+    cands.push({name:'スペース',rows:s2,score:scoreRows(s2)});
 
-    // スペース1+（単語分割）
-    const sp1rows = lines.map(l => l.trim().split(/\s+/).filter(c => c));
-    candidates.push({ name:'space1', rows: sp1rows });
+    // スペース1+
+    const s1=lines.map(l=>l.trim().split(/\s+/).filter(c=>c));
+    cands.push({name:'スペース',rows:s1,score:scoreRows(s1)});
 
     // 固定幅
-    const fwRows = parseFixedWidth(lines);
-    if (fwRows) candidates.push({ name:'fixed', rows: fwRows });
+    const fw=parseFixedWidth(lines);
+    if(fw) cands.push({name:'固定幅',rows:fw,score:scoreRows(fw)});
 
-    // スコアで最良候補を選択
-    let bestScore = 0;
-    chosenRows = sp1rows; // フォールバック
-    for (const cand of candidates) {
-      const s = scoreRows(cand.rows);
-      if (s > bestScore) { bestScore = s; chosenRows = cand.rows; }
-    }
+    const best=cands.reduce((a,b)=>b.score>a.score?b:a,cands[0]);
+    rows=best.rows;
+    parseMethod=best.name;
   }
 
-  // 列数を中央値に統一（外れ値の行を正規化）
-  const counts = chosenRows.map(r => r.length);
-  const sorted = [...counts].sort((a,b) => a-b);
-  const targetCols = sorted[Math.floor(sorted.length / 2)];
-  chosenRows = chosenRows.map(row => {
-    while (row.length < targetCols) row.push('');
-    return row.slice(0, targetCols);
-  });
+  // 列数を中央値に統一
+  const med=[...rows.map(r=>r.length)].sort((a,b)=>a-b)[Math.floor(rows.length/2)];
+  rows=rows.map(r=>{const c=[...r];while(c.length<med)c.push('');return c.slice(0,med)});
 
-  const headers  = chosenRows[0];
-  const dataRows = chosenRows.slice(1);
-  colTypes = detectColTypes(headers, dataRows);
-  return { headers, rows: dataRows };
+  const headers=rows[0];
+  const dataRows=rows.slice(1);
+  colTypes=detectColTypes(headers,dataRows);
+  return{headers,rows:dataRows};
 }
 
-function detectColTypes(headers, dataRows) {
-  return headers.map((_, ci) => {
-    const vals = dataRows.map(r => r[ci]).filter(v => v !== '');
-    if (!vals.length) return 'text';
-    const numCount = vals.filter(v => {
-      const c = v.replace(/,/g,'').replace(/%/,'').replace(/[+▲▼±]/g,'').trim();
-      return c !== '' && !isNaN(parseFloat(c));
+function detectColTypes(headers,dataRows){
+  return headers.map((_,ci)=>{
+    const vals=dataRows.map(r=>r[ci]).filter(v=>v!=='');
+    if(!vals.length) return 'text';
+    const n=vals.filter(v=>{
+      const c=v.replace(/,/g,'').replace(/%/,'').replace(/[+▲▼±]/g,'').trim();
+      return c!==''&&!isNaN(parseFloat(c));
     }).length;
-    return numCount / vals.length > 0.6 ? 'num' : 'text';
+    return n/vals.length>.6?'num':'text';
   });
 }
 
-function toNum(str) {
-  if (!str) return null;
-  const cleaned = str.replace(/,/g, '').replace('%', '');
-  const n = parseFloat(cleaned);
-  return isNaN(n) ? null : n;
+function toNum(s){
+  if(!s) return null;
+  const n=parseFloat(s.replace(/,/g,'').replace(/%/,''));
+  return isNaN(n)?null:n;
 }
 
-// ===== FORMAT =====
-function formatCell(val, colIdx) {
-  if (colTypes[colIdx] !== 'num') return { display: val, raw: val, isNum: false };
-  const fmt = document.getElementById('num-format').value;
-  const n = toNum(val);
-  if (n === null) return { display: val, raw: val, isNum: false };
+// ============================================================
+//  RENDER
+// ============================================================
+function render(){
+  if(!parsedData) return;
+  const{headers,rows}=parsedData;
 
-  let display = val;
-  if (fmt === 'comma' || (fmt === 'auto' && Math.abs(n) >= 1000)) {
-    display = n.toLocaleString('ja-JP', { maximumFractionDigits: 4 });
-  } else if (fmt === 'pct') {
-    display = (n * 100).toFixed(1) + '%';
-  } else {
-    // auto: if original has comma treat as comma
-    if (val.includes(',')) display = n.toLocaleString('ja-JP');
-    else display = val;
-  }
-  return { display, raw: n, isNum: true };
-}
-
-// ===== RENDER =====
-function render() {
-  if (!parsedData) return;
-  const { headers, rows } = parsedData;
-
-  // sort
-  let displayRows = [...rows];
-  if (sortCol >= 0) {
-    displayRows.sort((a, b) => {
-      const av = colTypes[sortCol] === 'num' ? (toNum(a[sortCol]) ?? -Infinity) : a[sortCol];
-      const bv = colTypes[sortCol] === 'num' ? (toNum(b[sortCol]) ?? -Infinity) : b[sortCol];
-      if (av < bv) return sortAsc ? -1 : 1;
-      if (av > bv) return sortAsc ? 1 : -1;
-      return 0;
+  let dRows=[...rows];
+  if(sortCol>=0){
+    dRows.sort((a,b)=>{
+      const av=colTypes[sortCol]==='num'?(toNum(a[sortCol])??-Infinity):a[sortCol];
+      const bv=colTypes[sortCol]==='num'?(toNum(b[sortCol])??-Infinity):b[sortCol];
+      return sortAsc?(av<bv?-1:av>bv?1:0):(av>bv?-1:av<bv?1:0);
     });
   }
 
-  // heat: per-col min/max for numeric
-  const colMinMax = headers.map((_, ci) => {
-    if (colTypes[ci] !== 'num') return null;
-    const vals = rows.map(r => toNum(r[ci])).filter(v => v !== null);
-    if (!vals.length) return null;
-    return { min: Math.min(...vals), max: Math.max(...vals) };
+  const colMM=headers.map((_,ci)=>{
+    if(colTypes[ci]!=='num') return null;
+    const v=rows.map(r=>toNum(r[ci])).filter(v=>v!==null);
+    return v.length?{min:Math.min(...v),max:Math.max(...v)}:null;
   });
 
-  // totals
-  const totals = document.getElementById('tog-total').checked
-    ? headers.map((_, ci) => {
-        if (colTypes[ci] !== 'num') return null;
-        const vals = rows.map(r => toNum(r[ci])).filter(v => v !== null);
-        return vals.reduce((a,b) => a+b, 0);
+  const totals=document.getElementById('tog-total').checked
+    ?headers.map((_,ci)=>{
+        if(colTypes[ci]!=='num') return null;
+        return rows.map(r=>toNum(r[ci])).filter(v=>v!==null).reduce((a,b)=>a+b,0);
       })
-    : null;
+    :null;
 
-  const showRowNum = document.getElementById('tog-rownum').checked;
-  const showHeat = document.getElementById('tog-heat').checked;
-  const showSummary = document.getElementById('tog-summary').checked;
-  const title = document.getElementById('title-input').value;
-  const subtitle = document.getElementById('subtitle-input').value;
+  const showIdx=document.getElementById('tog-rownum').checked;
+  const showHeat=document.getElementById('tog-heat').checked;
+  const showSum=document.getElementById('tog-summary').checked;
+  const title=document.getElementById('title-inp').value;
+  const sub=document.getElementById('subtitle-inp').value;
+  const fmt=document.getElementById('num-fmt').value;
 
-  let html = '';
+  function fmtNum(val,n){
+    if(fmt==='comma'||(fmt==='auto'&&Math.abs(n)>=1000))
+      return n.toLocaleString('ja-JP',{maximumFractionDigits:4});
+    if(fmt==='pct') return (n*100).toFixed(1)+'%';
+    if(val.includes(',')) return n.toLocaleString('ja-JP');
+    return val;
+  }
 
-  // title bar
-  if (title || subtitle) {
-    html += `<div class="table-title-bar">
-      ${title ? `<div class="table-title">${escHtml(title)}</div>` : ''}
-      ${subtitle ? `<div class="table-subtitle">${escHtml(subtitle)}</div>` : ''}
+  let h='';
+  if(title||sub){
+    h+=`<div class="table-title-bar">
+      ${title?`<div class="table-title">${e(title)}</div>`:''}
+      ${sub?`<div class="table-subtitle">${e(sub)}</div>`:''}
     </div>`;
   }
 
-  html += `<div class="table-scroll"><table class="theme-${currentScheme}">`;
-
-  // thead
-  html += '<thead><tr>';
-  if (showRowNum) html += '<th></th>';
-  headers.forEach((h, ci) => {
-    const isNum = colTypes[ci] === 'num';
-    const isSorted = sortCol === ci;
-    const icon = isSorted ? (sortAsc ? '↑' : '↓') : '↕';
-    html += `<th class="${isNum?'num':''} ${isSorted?'sorted':''}" onclick="doSort(${ci})">
-      ${escHtml(h)} <span class="sort-icon">${icon}</span>
-    </th>`;
+  h+=`<div class="table-scroll"><table class="theme-${scheme}"><thead><tr>`;
+  if(showIdx) h+='<th></th>';
+  headers.forEach((hdr,ci)=>{
+    const isN=colTypes[ci]==='num';
+    const isSorted=sortCol===ci;
+    h+=`<th class="${isN?'num':''} ${isSorted?'sorted':''}" onclick="doSort(${ci})">
+      ${e(hdr)}<span class="si">${isSorted?(sortAsc?'↑':'↓'):'↕'}</span></th>`;
   });
-  html += '</tr></thead>';
+  h+='</tr></thead><tbody>';
 
-  // tbody
-  html += '<tbody>';
-  displayRows.forEach((row, ri) => {
-    html += '<tr>';
-    if (showRowNum) html += `<td class="row-idx">${ri+1}</td>`;
-    row.forEach((val, ci) => {
-      const { display, raw, isNum } = formatCell(val, ci);
-      let cls = isNum ? 'num' : '';
-      if (isNum) {
-        if (raw < 0) cls += ' negative';
-        else if (raw === 0) cls += ' zero';
-      }
+  dRows.forEach((row,ri)=>{
+    h+='<tr>';
+    if(showIdx) h+=`<td class="row-idx">${ri+1}</td>`;
+    row.forEach((val,ci)=>{
+      const n=colTypes[ci]==='num'?toNum(val):null;
+      const isN=n!==null;
+      let cls=isN?'num':'';
+      if(isN){if(n<0)cls+=' neg';else if(n===0)cls+=' zero';}
+      const disp=isN?fmtNum(val,n):val;
 
-      if (showHeat && isNum && colMinMax[ci]) {
-        const { min, max } = colMinMax[ci];
-        const pct = max !== min ? Math.round((raw - min) / (max - min) * 100) : 0;
-        cls += ' heat';
-        html += `<td class="${cls}"><span class="bar" style="width:${pct}%"></span><span class="cell-val">${escHtml(display)}</span></td>`;
+      if(showHeat&&isN&&colMM[ci]&&colMM[ci].max!==colMM[ci].min){
+        const pct=Math.round((n-colMM[ci].min)/(colMM[ci].max-colMM[ci].min)*100);
+        h+=`<td class="${cls} heat"><span class="bar" style="width:${pct}%"></span><span class="cv">${e(disp)}</span></td>`;
       } else {
-        html += `<td class="${cls}">${escHtml(display)}</td>`;
+        h+=`<td class="${cls}">${e(disp)}</td>`;
       }
     });
-    html += '</tr>';
+    h+='</tr>';
   });
 
-  // total row
-  if (totals) {
-    html += '<tr style="font-weight:700;background:var(--row-even);border-top:2px solid var(--border)">';
-    if (showRowNum) html += '<td class="row-idx">計</td>';
-    totals.forEach((t, ci) => {
-      if (t === null) {
-        html += `<td style="color:var(--muted);font-size:0.8rem">合計</td>`;
-      } else {
-        const fmt = document.getElementById('num-format').value;
-        let display;
-        if (fmt === 'comma' || (fmt === 'auto' && Math.abs(t) >= 1000)) {
-          display = t.toLocaleString('ja-JP', { maximumFractionDigits: 4 });
-        } else {
-          display = t.toString();
-        }
-        html += `<td class="num">${escHtml(display)}</td>`;
-      }
+  if(totals){
+    h+='<tr class="total-row">';
+    if(showIdx) h+='<td class="row-idx">計</td>';
+    totals.forEach((t,ci)=>{
+      if(t===null) h+=`<td style="color:var(--muted);font-size:.78rem">合計</td>`;
+      else h+=`<td class="num">${t.toLocaleString('ja-JP',{maximumFractionDigits:4})}</td>`;
     });
-    html += '</tr>';
+    h+='</tr>';
   }
 
-  html += '</tbody></table></div>';
+  h+='</tbody></table></div>';
 
-  // summary footer
-  if (showSummary) {
-    const numCols = colTypes.filter(t => t === 'num').length;
-    const today = new Date().toLocaleDateString('ja-JP');
-    html += `<div class="table-footer">
-      <span><strong>${displayRows.length}</strong> 行 × <strong>${headers.length}</strong> 列</span>
-      <span>数値列: <strong>${numCols}</strong></span>
-      ${sortCol >= 0 ? `<span>ソート: <strong>${escHtml(headers[sortCol])}</strong> ${sortAsc?'昇順':'降順'}</span>` : ''}
+  if(showSum){
+    const numC=colTypes.filter(t=>t==='num').length;
+    const today=new Date().toLocaleDateString('ja-JP');
+    h+=`<div class="table-footer">
+      <span><strong>${dRows.length}</strong> 行 × <strong>${headers.length}</strong> 列</span>
+      <span>数値列: <strong>${numC}</strong></span>
+      ${sortCol>=0?`<span>ソート: <strong>${e(headers[sortCol])}</strong> ${sortAsc?'昇順':'降順'}</span>`:''}
       <span style="margin-left:auto">作成日: ${today}</span>
     </div>`;
   }
 
-  const container = document.getElementById('table-container');
-  container.innerHTML = html;
+  document.getElementById('table-container').innerHTML=h;
 }
 
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function e(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ============================================================
+//  SORT
+// ============================================================
+function doSort(ci){
+  if(sortCol===ci){ if(sortAsc){sortAsc=false}else{sortCol=-1;sortAsc=true} }
+  else{sortCol=ci;sortAsc=true}
+  document.getElementById('sort-reset-btn').style.display=sortCol>=0?'':'none';
+  render();
+}
+function resetSort(){sortCol=-1;sortAsc=true;document.getElementById('sort-reset-btn').style.display='none';render();}
+
+// ============================================================
+//  SET PARSED DATA  (共通ヘルパー)
+// ============================================================
+function applyData(rows, method){
+  if(!rows||rows.length<1) return false;
+  const headers=rows[0];
+  const dataRows=rows.slice(1);
+  colTypes=detectColTypes(headers,dataRows);
+  parsedData={headers,rows:dataRows};
+  parseMethod=method;
+  sortCol=-1;sortAsc=true;
+  document.getElementById('sort-reset-btn').style.display='none';
+  updateHint(dataRows.length,headers.length,method);
+  render();
+  return true;
 }
 
-// ===== SORT =====
-function doSort(ci) {
-  if (sortCol === ci) {
-    if (sortAsc) { sortAsc = false; }
-    else { sortCol = -1; sortAsc = true; }
-  } else {
-    sortCol = ci; sortAsc = true;
+function updateHint(numRows,numCols,method){
+  document.getElementById('parse-hint').textContent=`${numRows}行 × ${numCols}列`;
+  const badge=document.getElementById('parse-badge');
+  badge.textContent=method;
+  badge.style.display='inline';
+}
+
+// ============================================================
+//  PASTE HANDLERS
+// ============================================================
+
+// テキストエリアのペースト
+async function onRawPaste(e){
+  const items=Array.from(e.clipboardData.items);
+
+  // 1) 画像
+  const img=items.find(it=>it.type.startsWith('image/'));
+  if(img){ e.preventDefault(); await ocrImage(img.getAsFile()); return; }
+
+  // 2) HTMLテーブル (Excel / Google Sheets が最高精度)
+  const html=e.clipboardData.getData('text/html');
+  if(html&&html.includes('<table')){
+    const rows=parseHtmlTable(html);
+    if(rows&&rows.length>=2&&rows[0].length>=2){
+      e.preventDefault();
+      // TSVにしてテキストエリアにも表示（ユーザーが確認できるように）
+      document.getElementById('raw-input').value=rows.map(r=>r.join('\t')).join('\n');
+      applyData(rows,'HTMLテーブル');
+      showToast('表データを取り込みました ✓');
+      return;
+    }
   }
-  document.getElementById('sort-reset-btn').style.display = sortCol >= 0 ? '' : 'none';
-  render();
-}
-function resetSort() {
-  sortCol = -1; sortAsc = true;
-  document.getElementById('sort-reset-btn').style.display = 'none';
-  render();
+
+  // 3) プレーンテキスト
+  setTimeout(()=>{
+    const val=document.getElementById('raw-input').value;
+    if(!val.trim()) return;
+    const result=parseText(val);
+    if(result){ parsedData=result; updateHint(result.rows.length,result.headers.length,parseMethod); render(); }
+  },80);
 }
 
-// ===== INPUT =====
-function onInputChange() {
-  const raw = document.getElementById('raw-input').value;
-  parsedData = parseData(raw);
-  const hint = document.getElementById('parse-hint');
-  const empty = document.getElementById('empty-state');
+// ページ全体のペースト（テキストエリア以外にフォーカスがある時）
+document.addEventListener('paste',async e=>{
+  const ta=document.getElementById('raw-input');
+  const items=Array.from(e.clipboardData.items);
 
-  if (!parsedData) {
-    hint.textContent = 'データを貼り付けてください';
-    if (empty) empty.style.display = '';
+  // 画像は常にキャプチャ
+  const img=items.find(it=>it.type.startsWith('image/'));
+  if(img){ e.preventDefault(); await ocrImage(img.getAsFile()); return; }
+
+  // テキストエリア/input にフォーカスがある場合は onRawPaste に任せる
+  if(e.target===ta||e.target.tagName==='INPUT') return;
+
+  // HTMLテーブル
+  const html=e.clipboardData.getData('text/html');
+  if(html&&html.includes('<table')){
+    const rows=parseHtmlTable(html);
+    if(rows&&rows.length>=2&&rows[0].length>=2){
+      e.preventDefault();
+      ta.value=rows.map(r=>r.join('\t')).join('\n');
+      applyData(rows,'HTMLテーブル');
+      showToast('表データを取り込みました ✓');
+      return;
+    }
+  }
+
+  // プレーンテキスト
+  const txt=e.clipboardData.getData('text/plain');
+  if(!txt) return;
+  e.preventDefault();
+  ta.value=txt;
+  ta.focus();
+  const result=parseText(txt);
+  if(result){ parsedData=result; updateHint(result.rows.length,result.headers.length,parseMethod); render(); }
+  showToast('データを貼り付けました ✓');
+});
+
+// テキストエリアへの手入力
+function onTextChange(){
+  const val=document.getElementById('raw-input').value;
+  if(!val.trim()){
+    clearAll();return;
+  }
+  const result=parseText(val);
+  if(!result){
+    document.getElementById('parse-hint').textContent='解析できませんでした';
+    document.getElementById('parse-badge').style.display='none';
     return;
   }
-  if (empty) empty.style.display = 'none';
-
-  const { headers, rows } = parsedData;
-  const numCols = colTypes.filter(t => t === 'num').length;
-  hint.textContent = `${rows.length}行 × ${headers.length}列 を検出（数値列: ${numCols}）`;
-  sortCol = -1; sortAsc = true;
+  parsedData=result;
+  updateHint(result.rows.length,result.headers.length,parseMethod);
   render();
 }
 
-function clearData() {
-  document.getElementById('raw-input').value = '';
-  parsedData = null;
-  colTypes = [];
-  sortCol = -1;
-  document.getElementById('parse-hint').textContent = 'データを貼り付けてください';
-  document.getElementById('sort-reset-btn').style.display = 'none';
-  const container = document.getElementById('table-container');
-  container.innerHTML = `<div class="empty-state" id="empty-state">
+function clearAll(){
+  document.getElementById('raw-input').value='';
+  document.getElementById('parse-hint').textContent='データを貼り付けてください';
+  document.getElementById('parse-badge').style.display='none';
+  document.getElementById('sort-reset-btn').style.display='none';
+  parsedData=null;colTypes=[];sortCol=-1;
+  document.getElementById('table-container').innerHTML=`<div class="empty-state">
     <div class="empty-icon">📋</div>
     <div class="empty-title">データを貼り付けてください</div>
-    <div class="empty-hint">ExcelやGoogleスプレッドシートからコピーしたデータ、<br>CSVやTSV形式のテキストを左側に貼り付けると<br>レポート用の綺麗な表に変換します。</div>
+    <div class="empty-hint">Excel・スプレッドシート・CSV・テキストをコピーして<br>Cmd+V（Mac）/ Ctrl+V（Windows）で貼り付けると<br>綺麗なレポート表に変換します</div>
   </div>`;
 }
 
-// ===== SCHEME =====
-function setScheme(s) {
-  currentScheme = s;
-  document.querySelectorAll('.scheme-chip').forEach(el => {
-    el.classList.toggle('active', el.dataset.scheme === s);
-  });
+// ============================================================
+//  DRAG & DROP
+// ============================================================
+const ia=document.getElementById('input-area');
+ia.addEventListener('dragover',e=>{e.preventDefault();ia.classList.add('drag-over')});
+ia.addEventListener('dragleave',()=>ia.classList.remove('drag-over'));
+ia.addEventListener('drop',async e=>{
+  e.preventDefault();ia.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];if(!f)return;
+  if(f.type.startsWith('image/')){await ocrImage(f);return;}
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    document.getElementById('raw-input').value=ev.target.result;
+    onTextChange();
+  };
+  reader.readAsText(f,'UTF-8');
+});
+
+// ============================================================
+//  OCR  (Tesseract - 単語座標ベース再構成)
+// ============================================================
+async function ocrImage(blob){
+  const ov=document.getElementById('ocr-overlay');
+  const pg=document.getElementById('ocr-prog');
+  const bar=document.getElementById('ocr-bar');
+  ov.classList.add('show');
+  try{
+    const worker=await Tesseract.createWorker('jpn+eng',1,{
+      logger:m=>{
+        if(m.status==='recognizing text'){
+          const p=Math.round((m.progress||0)*100);
+          bar.style.width=p+'%';
+          pg.textContent=`テキスト認識中... ${p}%`;
+        }else{ pg.textContent=m.status; }
+      }
+    });
+    await worker.setParameters({tessedit_pageseg_mode:'6'});
+    const{data}=await worker.recognize(blob);
+    await worker.terminate();
+
+    const tsv=wordsToTsv(data.words);
+    const ta=document.getElementById('raw-input');
+    ta.value=tsv;
+    const result=parseText(tsv);
+    if(result){ parsedData=result; updateHint(result.rows.length,result.headers.length,'OCR'); render(); }
+    showToast('OCR完了 ✓');
+  }catch(err){
+    console.error(err);showToast('OCR失敗: '+err.message);
+  }finally{ ov.classList.remove('show'); }
+}
+
+// 単語の座標情報からTSVを再構成
+function wordsToTsv(words){
+  if(!words||!words.length) return '';
+  const ws=words.filter(w=>w.confidence>30&&w.text.trim()!=='');
+  if(!ws.length) return '';
+  ws.sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
+
+  // 行の高さ中央値
+  const hs=ws.map(w=>w.bbox.y1-w.bbox.y0).sort((a,b)=>a-b);
+  const medH=hs[Math.floor(hs.length/2)];
+  const gap=medH*0.9;
+
+  // Y座標でグループ化
+  const lines=[];let cur=[ws[0]];let baseY=ws[0].bbox.y0;
+  for(let i=1;i<ws.length;i++){
+    if(ws[i].bbox.y0-baseY>gap){lines.push(cur);cur=[ws[i]];baseY=ws[i].bbox.y0;}
+    else{cur.push(ws[i]);baseY=Math.max(baseY,ws[i].bbox.y0);}
+  }
+  lines.push(cur);
+  lines.forEach(l=>l.sort((a,b)=>a.bbox.x0-b.bbox.x0));
+
+  // 全単語のX開始位置をクラスタリングして列境界を決定
+  const allX=lines.flatMap(l=>l.map(w=>w.bbox.x0));
+  const colB=clusterX(allX,medH*1.5);
+
+  if(colB.length<=1){
+    // 列が1つ = 通常テキスト
+    return lines.map(l=>l.map(w=>w.text).join(' ')).join('\n');
+  }
+
+  return lines.map(l=>{
+    const cells=new Array(colB.length).fill('');
+    for(const w of l){
+      const ci=colB.reduce((best,b,i)=>Math.abs(w.bbox.x0-b)<Math.abs(w.bbox.x0-colB[best])?i:best,0);
+      cells[ci]=(cells[ci]+' '+w.text).trim();
+    }
+    return cells.join('\t');
+  }).join('\n');
+}
+
+function clusterX(xs,tol){
+  const s=[...new Set(xs)].sort((a,b)=>a-b);
+  if(!s.length) return[0];
+  const clusters=[[s[0]]];
+  for(let i=1;i<s.length;i++){
+    const last=clusters[clusters.length-1];
+    if(s[i]-last[last.length-1]<=tol) last.push(s[i]);
+    else clusters.push([s[i]]);
+  }
+  return clusters.map(c=>c[Math.floor(c.length/2)]);
+}
+
+// ============================================================
+//  SCHEME / THEME
+// ============================================================
+function setScheme(s){
+  scheme=s;
+  document.querySelectorAll('.scheme-chip').forEach(el=>el.classList.toggle('active',el.dataset.s===s));
   render();
 }
-
-// ===== THEME =====
-function toggleTheme() {
-  const isDark = document.body.getAttribute('data-theme') === 'dark';
-  document.body.setAttribute('data-theme', isDark ? '' : 'dark');
-  document.getElementById('theme-btn').textContent = isDark ? '🌙 ダーク' : '☀ ライト';
+function toggleTheme(){
+  const dark=document.body.getAttribute('data-theme')==='dark';
+  document.body.setAttribute('data-theme',dark?'':'dark');
+  document.getElementById('theme-btn').textContent=dark?'🌙 ダーク':'☀ ライト';
 }
 
-// ===== EXPORT =====
-function printTable() { window.print(); }
-
-async function downloadImage() {
-  const el = document.getElementById('table-container');
-  if (!parsedData) { showToast('データがありません'); return; }
-  showToast('画像を生成中...');
-  const canvas = await html2canvas(el, { scale: 2, backgroundColor: null });
-  const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = (document.getElementById('title-input').value || '数表') + '.png';
-  a.click();
-  showToast('PNG保存しました ✓');
+// ============================================================
+//  EXPORT
+// ============================================================
+function printTable(){window.print();}
+async function downloadImage(){
+  if(!parsedData){showToast('データがありません');return;}
+  showToast('画像生成中...');
+  const canvas=await html2canvas(document.getElementById('table-container'),{scale:2,backgroundColor:null});
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download=(document.getElementById('title-inp').value||'数表')+'.png';
+  a.click();showToast('PNG保存しました ✓');
 }
-
-async function copyImage() {
-  const el = document.getElementById('table-container');
-  if (!parsedData) { showToast('データがありません'); return; }
-  try {
+async function copyImage(){
+  if(!parsedData){showToast('データがありません');return;}
+  try{
     showToast('クリップボードにコピー中...');
-    const canvas = await html2canvas(el, { scale: 2, backgroundColor: null });
-    canvas.toBlob(async blob => {
-      await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
+    const canvas=await html2canvas(document.getElementById('table-container'),{scale:2,backgroundColor:null});
+    canvas.toBlob(async blob=>{
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
       showToast('画像をコピーしました ✓');
     });
-  } catch(e) {
-    showToast('コピー失敗（ブラウザ制限）');
-  }
+  }catch(err){showToast('コピー失敗（ブラウザ制限）');}
 }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-// ===== SAMPLES =====
-const SAMPLES = {
-  sales: `月\t売上（万円）\t前月比\t目標達成率
+// ============================================================
+//  SAMPLES
+// ============================================================
+const SAMPLES={
+  sales:`月\t売上（万円）\t前月比\t目標達成率
 1月\t1,234\t-\t98.2%
 2月\t1,189\t-3.6%\t94.8%
 3月\t1,456\t22.5%\t116.0%
@@ -1147,8 +910,7 @@ const SAMPLES = {
 10月\t1,612\t11.6%\t128.4%
 11月\t1,789\t11.0%\t142.5%
 12月\t2,134\t19.3%\t170.0%`,
-
-  kpi: `指標\t今期\t前期\t差分\t評価
+  kpi:`指標\t今期\t前期\t差分\t評価
 新規顧客数\t342\t298\t+44\t↑
 継続率\t87.3%\t84.1%\t+3.2%\t↑
 平均単価\t24,800\t22,400\t+2,400\t↑
@@ -1156,8 +918,7 @@ NPS\t62\t58\t+4\t↑
 解約率\t2.1%\t3.4%\t-1.3%\t↑
 問い合わせ対応時間\t4.2時間\t6.8時間\t-2.6時間\t↑
 従業員満足度\t78\t71\t+7\t↑`,
-
-  compare: `部門\t2023年売上\t2024年売上\t増減\t成長率
+  compare:`部門\t2023年売上\t2024年売上\t増減\t成長率
 東日本\t45,200,000\t51,800,000\t6,600,000\t14.6%
 西日本\t38,900,000\t41,200,000\t2,300,000\t5.9%
 中部\t22,400,000\t25,600,000\t3,200,000\t14.3%
@@ -1166,193 +927,11 @@ NPS\t62\t58\t+4\t↑
 海外\t5,600,000\t9,400,000\t3,800,000\t67.9%`
 };
 
-function loadSample(key) {
-  document.getElementById('raw-input').value = SAMPLES[key];
-  const titles = { sales: '月別売上実績', kpi: 'KPI ダッシュボード', compare: '部門別前年比較' };
-  document.getElementById('title-input').value = titles[key];
-  onInputChange();
-}
-
-// ===== DRAG & DROP (input-area) =====
-const inputArea = document.getElementById('input-area');
-const rawInput  = document.getElementById('raw-input');
-
-inputArea.addEventListener('dragover', e => { e.preventDefault(); inputArea.classList.add('drag-over'); });
-inputArea.addEventListener('dragleave', () => inputArea.classList.remove('drag-over'));
-inputArea.addEventListener('drop', async e => {
-  e.preventDefault();
-  inputArea.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  if (file.type.startsWith('image/')) {
-    await ocrImage(file);
-  } else {
-    const reader = new FileReader();
-    reader.onload = ev => { rawInput.value = ev.target.result; onInputChange(); };
-    reader.readAsText(file, 'UTF-8');
-  }
-});
-
-// テキストエリア内のペーストハンドラ（画像も検出）
-async function onRawPaste(e) {
-  const items = Array.from(e.clipboardData.items);
-  const imageItem = items.find(it => it.type.startsWith('image/'));
-  if (imageItem) {
-    e.preventDefault();
-    await ocrImage(imageItem.getAsFile());
-    return;
-  }
-  // テキストはブラウザのデフォルト動作に任せ、少し待ってから解析
-  setTimeout(onInputChange, 50);
-}
-
-// ページのどこでも貼り付け可能にする（テキストエリア以外）
-document.addEventListener('paste', async e => {
-  const target = e.target;
-  const ta = document.getElementById('raw-input');
-
-  const items = Array.from(e.clipboardData.items);
-  const imageItem = items.find(it => it.type.startsWith('image/'));
-
-  if (imageItem) {
-    e.preventDefault();
-    await ocrImage(imageItem.getAsFile());
-    return;
-  }
-
-  // テキストエリアや入力欄にフォーカスがある場合はそちらで処理済み
-  if (target === ta || target.tagName === 'INPUT') return;
-
-  const text = e.clipboardData.getData('text/plain');
-  if (!text) return;
-  e.preventDefault();
-  ta.value = text;
-  ta.focus();
-  onInputChange();
-  showToast('データを貼り付けました ✓');
-});
-
-// ===== OCR =====
-async function ocrImage(blob) {
-  const overlay = document.getElementById('ocr-overlay');
-  const progressEl = document.getElementById('ocr-progress');
-  const barEl = document.getElementById('ocr-bar');
-  overlay.classList.add('show');
-
-  try {
-    const worker = await Tesseract.createWorker('jpn+eng', 1, {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          const pct = Math.round((m.progress || 0) * 100);
-          barEl.style.width = pct + '%';
-          progressEl.textContent = `テキスト認識中... ${pct}%`;
-        } else {
-          progressEl.textContent = m.status;
-        }
-      }
-    });
-
-    // psm:6 = 均一なテキストブロックとして処理（表に最適）
-    await worker.setParameters({ tessedit_pageseg_mode: '6' });
-    const { data } = await worker.recognize(blob);
-    await worker.terminate();
-
-    // 単語の座標情報を使って列を再構成
-    const tsv = wordsToTsv(data.words);
-    const ta = document.getElementById('raw-input');
-    ta.value = tsv;
-    onInputChange();
-    showToast('画像のOCR完了 ✓');
-  } catch(err) {
-    console.error(err);
-    showToast('OCR失敗: ' + err.message);
-  } finally {
-    overlay.classList.remove('show');
-  }
-}
-
-// Tesseractの単語座標から表を再構成してTSV文字列を返す
-function wordsToTsv(words) {
-  if (!words || !words.length) return '';
-
-  // 信頼度の低い単語・空文字を除外
-  const ws = words.filter(w => w.confidence > 30 && w.text.trim() !== '');
-  if (!ws.length) return '';
-
-  // Y座標でソートし、行にグループ化
-  ws.sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
-
-  // 行の高さの中央値を求めて行グループ化の閾値とする
-  const heights = ws.map(w => w.bbox.y1 - w.bbox.y0).sort((a,b) => a-b);
-  const medH = heights[Math.floor(heights.length / 2)];
-  const rowGap = medH * 0.8;
-
-  const lineGroups = [];
-  let curLine = [ws[0]];
-  let lineBaseY = ws[0].bbox.y0;
-
-  for (let i = 1; i < ws.length; i++) {
-    const w = ws[i];
-    if (w.bbox.y0 - lineBaseY > rowGap) {
-      lineGroups.push(curLine);
-      curLine = [w];
-      lineBaseY = w.bbox.y0;
-    } else {
-      curLine.push(w);
-      lineBaseY = Math.max(lineBaseY, w.bbox.y0);
-    }
-  }
-  lineGroups.push(curLine);
-
-  // 各行を X 順にソート
-  lineGroups.forEach(line => line.sort((a,b) => a.bbox.x0 - b.bbox.x0));
-
-  // 全単語のX開始位置を収集して列境界をクラスタリング
-  const allX0s = lineGroups.flatMap(line => line.map(w => w.bbox.x0));
-  const colBounds = clusterXPositions(allX0s, medH * 1.2);
-
-  // 列が1つしか検出されない場合（=通常テキスト）はスペース区切りで結合
-  if (colBounds.length <= 1) {
-    return lineGroups.map(line => line.map(w => w.text).join(' ')).join('\n');
-  }
-
-  // 各単語をどの列に属するか判定してTSVに変換
-  return lineGroups.map(line => {
-    const cells = new Array(colBounds.length).fill('');
-    for (const w of line) {
-      const ci = findColIndex(w.bbox.x0, colBounds);
-      cells[ci] = (cells[ci] + ' ' + w.text).trim();
-    }
-    return cells.join('\t');
-  }).join('\n');
-}
-
-// X座標リストをクラスタリングして列境界を返す
-function clusterXPositions(xs, tolerance) {
-  if (!xs.length) return [0];
-  const sorted = [...new Set(xs)].sort((a,b) => a-b);
-  const clusters = [[sorted[0]]];
-  for (let i = 1; i < sorted.length; i++) {
-    const last = clusters[clusters.length - 1];
-    if (sorted[i] - last[last.length - 1] <= tolerance) {
-      last.push(sorted[i]);
-    } else {
-      clusters.push([sorted[i]]);
-    }
-  }
-  // 各クラスターの中央値を列開始位置とする
-  return clusters.map(c => c[Math.floor(c.length / 2)]);
-}
-
-// 単語のX位置がどの列に属するかを返す
-function findColIndex(x, colBounds) {
-  let best = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < colBounds.length; i++) {
-    const dist = Math.abs(x - colBounds[i]);
-    if (dist < bestDist) { bestDist = dist; best = i; }
-  }
-  return best;
+function loadSample(k){
+  const titles={sales:'月別売上実績',kpi:'KPI ダッシュボード',compare:'部門別前年比較'};
+  document.getElementById('raw-input').value=SAMPLES[k];
+  document.getElementById('title-inp').value=titles[k];
+  onTextChange();
 }
 </script>
 </body>
