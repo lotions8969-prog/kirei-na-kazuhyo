@@ -1039,11 +1039,20 @@ dz.addEventListener('drop', e => {
   }
 });
 
-// global paste shortcut
-document.addEventListener('keydown', e => {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
-    document.getElementById('raw-input').focus();
-  }
+// ページのどこでも Cmd+V / Ctrl+V で貼り付け可能にする
+document.addEventListener('paste', e => {
+  const target = e.target;
+  const ta = document.getElementById('raw-input');
+  // テキストエリアや入力欄にフォーカスがある場合はブラウザのデフォルト動作に任せる
+  if (target === ta || target.tagName === 'INPUT') return;
+
+  const text = e.clipboardData.getData('text/plain');
+  if (!text) return;
+  e.preventDefault();
+  ta.value = text;
+  ta.focus();
+  onInputChange();
+  showToast('データを貼り付けました ✓');
 });
 </script>
 </body>
