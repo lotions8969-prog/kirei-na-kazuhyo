@@ -710,99 +710,145 @@ let sortAsc = true;
 let colTypes = [];       // 'num' | 'text'
 
 // ===== PARSE =====
+
+// スコア: 列数が多く・ばらつきが少ないほど高得点
+function scoreRows(rows) {
+  if (!rows.length) return 0;
+  const counts = rows.map(r => r.length);
+  const sorted = [...counts].sort((a,b) => a-b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  if (median <= 1) return 0;
+  const consistent = counts.filter(c => Math.abs(c - median) <= 1).length / counts.length;
+  return median * consistent;
+}
+
+// CSV（ダブルクォート対応）
+function csvSplit(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQ = !inQ; continue; }
+    if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+    else cur += ch;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+// Markdownテーブル（| 区切り）
+function pipeSplit(line) {
+  const cells = line.split('|').map(c => c.trim());
+  if (cells[0] === '') cells.shift();
+  if (cells[cells.length - 1] === '') cells.pop();
+  return cells;
+}
+
+// 固定幅列検出（スペースが多くの行で揃っている位置を列境界とする）
+function parseFixedWidth(lines) {
+  if (lines.length < 2) return null;
+  const maxLen = Math.max(...lines.map(l => l.length));
+  const spaceFreq = new Array(maxLen).fill(0);
+  for (const line of lines) {
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === ' ') spaceFreq[i]++;
+    }
+    for (let i = line.length; i < maxLen; i++) spaceFreq[i]++;
+  }
+  const threshold = lines.length * 0.65;
+  // スペースの"塊"が終わる位置（非スペースが来る直前）を列開始とする
+  const colStarts = [0];
+  let inSpace = spaceFreq[0] >= threshold;
+  for (let i = 1; i < maxLen; i++) {
+    const isSpace = spaceFreq[i] >= threshold;
+    if (!isSpace && inSpace) colStarts.push(i);
+    inSpace = isSpace;
+  }
+  if (colStarts.length < 2) return null;
+  return lines.map(line =>
+    colStarts.map((start, idx) => {
+      const end = idx + 1 < colStarts.length ? colStarts[idx + 1] : line.length;
+      return line.slice(start, Math.min(end, line.length)).trim();
+    })
+  );
+}
+
 function parseData(raw) {
-  raw = raw.trim();
+  raw = raw.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  raw = raw.replace(/[\u200B-\u200D\uFEFF]/g, ''); // ゼロ幅文字除去
   if (!raw) return null;
 
-  const lines = raw.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 1) return null;
+  const lines = raw.split('\n').filter(l => l.trim());
+  if (!lines.length) return null;
 
-  // ---- 区切り文字の決定 ----
-  const manualDelim = document.getElementById('delim-select')
-    ? document.getElementById('delim-select').value
-    : 'auto';
+  const manualDelim = document.getElementById('delim-select')?.value ?? 'auto';
 
-  let splitFn;
+  let chosenRows;
 
   if (manualDelim !== 'auto') {
-    // 手動指定
-    const delimMap = { tab: '\t', comma: ',', space: /\s+/, pipe: '|', semi: ';' };
-    const d = delimMap[manualDelim];
-    splitFn = line => {
-      const parts = typeof d === 'string'
-        ? line.split(d)
-        : line.trim().split(d);
-      return parts.map(c => c.trim().replace(/^["']|["']$/g, ''));
+    const fns = {
+      tab:   l => l.split('\t').map(c => c.trim()),
+      comma: l => csvSplit(l),
+      space: l => l.trim().split(/\s+/).filter(c => c),
+      pipe:  l => pipeSplit(l),
+      semi:  l => l.split(';').map(c => c.trim()),
     };
+    chosenRows = lines.map(fns[manualDelim] || (l => [l]));
   } else {
-    // 自動検出
-    const medianColCount = arr => {
-      const sorted = [...arr].sort((a,b)=>a-b);
-      return sorted[Math.floor(sorted.length/2)];
-    };
+    // ===== 自動検出: 全候補をスコアリングして最良を選ぶ =====
+    const candidates = [];
 
-    const tabCounts   = lines.map(l => (l.match(/\t/g)||[]).length);
-    const commaCounts = lines.map(l => (l.match(/,/g)||[]).length);
-    const pipeCounts  = lines.map(l => (l.match(/\|/g)||[]).length);
-    const semiCounts  = lines.map(l => (l.match(/;/g)||[]).length);
-    const maxTab   = Math.max(...tabCounts);
-    const maxComma = Math.max(...commaCounts);
-    const maxPipe  = Math.max(...pipeCounts);
-    const maxSemi  = Math.max(...semiCounts);
+    // タブ
+    const tabRows = lines.map(l => l.split('\t').map(c => c.trim()));
+    candidates.push({ name:'tab', rows: tabRows });
 
-    if (maxTab > 0) {
-      // TSV（Excelコピー等）
-      splitFn = line => line.split('\t').map(c => c.trim().replace(/^["']|["']$/g, ''));
-    } else if (maxComma > 0 && maxComma >= maxPipe && maxComma >= maxSemi) {
-      // CSV（クォート対応）
-      splitFn = line => {
-        const result = []; let cur = ''; let inQ = false;
-        for (let i = 0; i < line.length; i++) {
-          const ch = line[i];
-          if (ch === '"') { inQ = !inQ; continue; }
-          if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
-          else cur += ch;
-        }
-        result.push(cur.trim());
-        return result;
-      };
-    } else if (maxPipe > 0 && maxPipe >= maxSemi) {
-      splitFn = line => line.split('|').map(c => c.trim()).filter((c,i,a)=> !(i===0&&c==='') && !(i===a.length-1&&c===''));
-    } else if (maxSemi > 0) {
-      splitFn = line => line.split(';').map(c => c.trim());
-    } else {
-      // スペース区切り: まず2+スペースで試し、列数が安定しなければ1+スペースにフォールバック
-      const trySplit = (lines, re) => lines.map(l => l.trim().split(re).map(c=>c.trim()).filter(c=>c!==''));
-      const rows2  = trySplit(lines, /\s{2,}/);
-      const rows1  = trySplit(lines, /\s+/);
-      const med2   = medianColCount(rows2.map(r=>r.length));
-      const med1   = medianColCount(rows1.map(r=>r.length));
-      const dev2   = rows2.reduce((s,r)=>s+Math.abs(r.length-med2),0);
-      const dev1   = rows1.reduce((s,r)=>s+Math.abs(r.length-med1),0);
+    // CSV
+    const csvRows = lines.map(csvSplit);
+    candidates.push({ name:'csv', rows: csvRows });
 
-      // 列数が1より多く、かつ列数のばらつきが小さい方を選ぶ
-      let chosen;
-      if (med2 > 1 && dev2 <= dev1) chosen = rows2;
-      else if (med1 > 1) chosen = rows1;
-      else chosen = rows1; // 最終フォールバック
+    // セミコロン
+    const semiRows = lines.map(l => l.split(';').map(c => c.trim()));
+    candidates.push({ name:'semi', rows: semiRows });
 
-      // splitFn は不要（行ごとに既に分割済みなので直接使う）
-      const maxCols2 = Math.max(...chosen.map(r=>r.length));
-      chosen.forEach(r => { while(r.length < maxCols2) r.push(''); });
-      const headers = chosen[0];
-      const dataRows = chosen.slice(1);
-      colTypes = detectColTypes(headers, dataRows);
-      return { headers, rows: dataRows };
+    // パイプ（Markdownテーブル含む）
+    const hasPipe = lines.some(l => l.includes('|'));
+    if (hasPipe) {
+      // セパレータ行（|---| 等）を除外してからパース
+      const noSep = lines.filter(l => !/^\|?[\s|:-]+\|/.test(l));
+      candidates.push({ name:'pipe', rows: noSep.map(pipeSplit) });
+    }
+
+    // スペース2+
+    const sp2rows = lines.map(l => l.trim().split(/\s{2,}/).map(c => c.trim()).filter(c => c));
+    candidates.push({ name:'space2', rows: sp2rows });
+
+    // スペース1+（単語分割）
+    const sp1rows = lines.map(l => l.trim().split(/\s+/).filter(c => c));
+    candidates.push({ name:'space1', rows: sp1rows });
+
+    // 固定幅
+    const fwRows = parseFixedWidth(lines);
+    if (fwRows) candidates.push({ name:'fixed', rows: fwRows });
+
+    // スコアで最良候補を選択
+    let bestScore = 0;
+    chosenRows = sp1rows; // フォールバック
+    for (const cand of candidates) {
+      const s = scoreRows(cand.rows);
+      if (s > bestScore) { bestScore = s; chosenRows = cand.rows; }
     }
   }
 
-  // splitFn が決まっている場合の共通処理
-  const rows = lines.map(splitFn);
-  const maxCols = Math.max(...rows.map(r => r.length));
-  rows.forEach(r => { while(r.length < maxCols) r.push(''); });
+  // 列数を中央値に統一（外れ値の行を正規化）
+  const counts = chosenRows.map(r => r.length);
+  const sorted = [...counts].sort((a,b) => a-b);
+  const targetCols = sorted[Math.floor(sorted.length / 2)];
+  chosenRows = chosenRows.map(row => {
+    while (row.length < targetCols) row.push('');
+    return row.slice(0, targetCols);
+  });
 
-  const headers  = rows[0];
-  const dataRows = rows.slice(1);
+  const headers  = chosenRows[0];
+  const dataRows = chosenRows.slice(1);
   colTypes = detectColTypes(headers, dataRows);
   return { headers, rows: dataRows };
 }
@@ -1206,13 +1252,15 @@ async function ocrImage(blob) {
       }
     });
 
-    const { data: { text } } = await worker.recognize(blob);
+    // psm:6 = 均一なテキストブロックとして処理（表に最適）
+    await worker.setParameters({ tessedit_pageseg_mode: '6' });
+    const { data } = await worker.recognize(blob);
     await worker.terminate();
 
-    // OCR結果をテキストエリアに流し込む
-    const cleaned = cleanOcrText(text);
+    // 単語の座標情報を使って列を再構成
+    const tsv = wordsToTsv(data.words);
     const ta = document.getElementById('raw-input');
-    ta.value = cleaned;
+    ta.value = tsv;
     onInputChange();
     showToast('画像のOCR完了 ✓');
   } catch(err) {
@@ -1223,19 +1271,88 @@ async function ocrImage(blob) {
   }
 }
 
-function cleanOcrText(raw) {
-  return raw
-    .split(/\r?\n/)
-    .map(l => l
-      // 全角スペース→半角
-      .replace(/　/g, ' ')
-      // OCR由来の縦棒（表の罫線）を除去
-      .replace(/[|｜]/g, '\t')
-      // 連続スペース正規化（先頭・末尾除く）
-      .trim()
-    )
-    .filter(l => l.length > 0)
-    .join('\n');
+// Tesseractの単語座標から表を再構成してTSV文字列を返す
+function wordsToTsv(words) {
+  if (!words || !words.length) return '';
+
+  // 信頼度の低い単語・空文字を除外
+  const ws = words.filter(w => w.confidence > 30 && w.text.trim() !== '');
+  if (!ws.length) return '';
+
+  // Y座標でソートし、行にグループ化
+  ws.sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
+
+  // 行の高さの中央値を求めて行グループ化の閾値とする
+  const heights = ws.map(w => w.bbox.y1 - w.bbox.y0).sort((a,b) => a-b);
+  const medH = heights[Math.floor(heights.length / 2)];
+  const rowGap = medH * 0.8;
+
+  const lineGroups = [];
+  let curLine = [ws[0]];
+  let lineBaseY = ws[0].bbox.y0;
+
+  for (let i = 1; i < ws.length; i++) {
+    const w = ws[i];
+    if (w.bbox.y0 - lineBaseY > rowGap) {
+      lineGroups.push(curLine);
+      curLine = [w];
+      lineBaseY = w.bbox.y0;
+    } else {
+      curLine.push(w);
+      lineBaseY = Math.max(lineBaseY, w.bbox.y0);
+    }
+  }
+  lineGroups.push(curLine);
+
+  // 各行を X 順にソート
+  lineGroups.forEach(line => line.sort((a,b) => a.bbox.x0 - b.bbox.x0));
+
+  // 全単語のX開始位置を収集して列境界をクラスタリング
+  const allX0s = lineGroups.flatMap(line => line.map(w => w.bbox.x0));
+  const colBounds = clusterXPositions(allX0s, medH * 1.2);
+
+  // 列が1つしか検出されない場合（=通常テキスト）はスペース区切りで結合
+  if (colBounds.length <= 1) {
+    return lineGroups.map(line => line.map(w => w.text).join(' ')).join('\n');
+  }
+
+  // 各単語をどの列に属するか判定してTSVに変換
+  return lineGroups.map(line => {
+    const cells = new Array(colBounds.length).fill('');
+    for (const w of line) {
+      const ci = findColIndex(w.bbox.x0, colBounds);
+      cells[ci] = (cells[ci] + ' ' + w.text).trim();
+    }
+    return cells.join('\t');
+  }).join('\n');
+}
+
+// X座標リストをクラスタリングして列境界を返す
+function clusterXPositions(xs, tolerance) {
+  if (!xs.length) return [0];
+  const sorted = [...new Set(xs)].sort((a,b) => a-b);
+  const clusters = [[sorted[0]]];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = clusters[clusters.length - 1];
+    if (sorted[i] - last[last.length - 1] <= tolerance) {
+      last.push(sorted[i]);
+    } else {
+      clusters.push([sorted[i]]);
+    }
+  }
+  // 各クラスターの中央値を列開始位置とする
+  return clusters.map(c => c[Math.floor(c.length / 2)]);
+}
+
+// 単語のX位置がどの列に属するかを返す
+function findColIndex(x, colBounds) {
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < colBounds.length; i++) {
+    const dist = Math.abs(x - colBounds[i]);
+    if (dist < bestDist) { bestDist = dist; best = i; }
+  }
+  return best;
 }
 </script>
 </body>
